@@ -1,19 +1,27 @@
+import argparse
+from pathlib import Path
 from flask import Flask, request, jsonify
 from .ledger import FileLedger, LedgerError
-from .config import Config
 from pathlib import Path
 import http
 from marshmallow import Schema, fields, ValidationError
-import os
-import signal
+from dataclasses import dataclass
+from pathlib import Path
+import logging
 
 
-def create_app():
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--port", type=int, required=True)
+    p.add_argument("--ledger-file", required=True)
+
+    args = p.parse_args()
+
     app = Flask(__name__)
-    config = Config.from_env()
 
-    ledger_path = Path(config.LEDGER_PATH)
-    ledger = FileLedger(fpath=ledger_path)
+    logging.getLogger("werkzeug").setLevel(logging.WARN)
+
+    ledger = FileLedger(fpath=Path(args.ledger_file))
 
     @app.errorhandler(LedgerError)
     def on_ledger_error(error: LedgerError):
@@ -68,13 +76,22 @@ def create_app():
         ledger.transfer(data["from_uid"], data["to_uid"], data["amount"])
         return {}
 
-    @app.put("/admin/kill")
-    def kill():
-        func = request.environ.get("werkzeug.server.shutdown")
-        if func is None:
-            os.kill(os.getpid(), signal.SIGINT)
-        else:
-            func()
+    @app.get("/admin/healthcheck")
+    def healthcheck():
         return {}
 
-    return app
+    class ElectLeaderSchema(Schema):
+        other_nodes = fields.List(fields.Str())
+
+    @app.post("/admin/elect_leader")
+    def elect_leader():
+        data = ElectLeaderSchema().load(request.json)
+        other_nodes: list[str] = data["other_nodes"]
+        # TODO Implement this part (Basic Paxos)
+        return {"leader": f"http://{request.host}"}
+
+    app.run(debug=False, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

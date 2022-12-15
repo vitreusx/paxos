@@ -1,0 +1,4 @@
+accounts:
+  0: {funds: '0', uid: 0}
+  1: {funds: '0', uid: 1}
+next_uid: 2
