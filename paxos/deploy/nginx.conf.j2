@@ -1,6 +1,5 @@
 error_log /tmp/error.log;
 pid /tmp/nginx.pid;
-daemon off;
 
 events {
   worker_connections 1024;
@@ -19,6 +18,10 @@ http {
     scgi_temp_path /tmp/scgi_temp;
     uwsgi_temp_path /tmp/uwsgi_temp;
 
-    location / {}
+    location / {
+      {% if leader is not none %}
+      proxy_pass {{ leader }};
+      {% endif %}
+    }
   }
 }

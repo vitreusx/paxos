@@ -15,6 +15,11 @@ import requests
 import shutil
 import jinja2
 from urllib.parse import urlparse
+from flask import Flask, request
+from marshmallow import Schema, fields
+import os
+from multiprocessing import Process
+import sys
 
 
 def get_socket(host="", port=0):
@@ -100,6 +105,10 @@ def main():
         else:
             worker_ports = []
 
+        flask_sock = get_socket()
+        flask_port = port_of_socket(flask_sock)
+        rsvd.append(flask_sock)
+
     def parse_bounds(bounds):
         if bounds is not None:
             if len(bounds) > 1:
@@ -140,12 +149,15 @@ def main():
         j2_env = jinja2.Environment(loader=j2_loader)
         nginx_conf_j2 = j2_env.get_template("nginx.conf.j2")
 
-        conf_txt = nginx_conf_j2.render({"gateway_port": args.gateway_port})
+        conf_txt = nginx_conf_j2.render(
+            gateway_port=args.gateway_port,
+            leader=None,
+        )
         gateway_conf.write(conf_txt)
         gateway_conf.close()
 
         gateway_proc = subprocess.Popen(
-            ["nginx", "-c", gateway_conf.name],
+            ["nginx", "-g", "'daemon off;'", "-c", gateway_conf.name],
             stdin=DEVNULL,
             stdout=DEVNULL,
             stderr=DEVNULL,
@@ -153,6 +165,33 @@ def main():
 
         logging.info(f"Running gateway on http://localhost:{args.gateway_port}")
         logging.info(f"Gateway args: {gateway_proc.args}")
+
+    app = Flask(__name__)
+
+    class UpdateLeaderSchema(Schema):
+        leader = fields.Str()
+
+    @app.put("/leader")
+    def update_leader():
+        data = UpdateLeaderSchema().load(request.json)
+
+        conf_txt = nginx_conf_j2.render(
+            gateway_port=args.gateway_port,
+            leader=data["leader"],
+        )
+        with open(gateway_conf.name, "w") as conf_f:
+            conf_f.write(conf_txt)
+
+        os.kill(gateway_proc.pid, signal.SIGHUP)
+
+        return {}
+
+    def flask_fn():
+        sys.stdout = sys.stderr = open(os.devnull, "w")
+        app.run(use_reloader=False, debug=False, port=flask_port)
+
+    flask_proc = Process(target=flask_fn)
+    flask_proc.start()
 
     workers = []
     for port in worker_ports:
@@ -234,9 +273,8 @@ def main():
     prober_argv.extend(["--port", str(prober_port)])
     prober_argv.extend(["--worker-ports", *(str(w["port"]) for w in workers)])
     if args.gateway_port is not None:
-        prober_argv.extend(["--gateway-port", str(args.gateway_port)])
-        prober_argv.extend(["--gateway-pid", str(gateway_proc.pid)])
-        prober_argv.extend(["--gateway-conf", gateway_conf.name])
+        leader_url = f"http://localhost:{flask_port}/leader"
+        prober_argv.extend(["--leader-url", leader_url])
 
     prober_proc = subprocess.Popen(prober_argv, stdout=DEVNULL, stdin=DEVNULL)
     logging.info(f"Running prober on http://localhost:{prober_port}")
@@ -265,6 +303,9 @@ def main():
 
     prober_proc.terminate()
     prober_proc.wait()
+
+    flask_proc.terminate()
+    flask_proc.join()
 
     if killer is not None:
         with any_alive_cv:

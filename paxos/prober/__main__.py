@@ -26,9 +26,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--probe-period", type=float, required=True)
     p.add_argument("--port", type=int, required=True)
-    p.add_argument("--gateway-pid", type=int)
-    p.add_argument("--gateway-conf")
-    p.add_argument("--gateway-port", type=int)
+    p.add_argument("--leader-url")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--workers", type=str, nargs="*")
     g.add_argument("--worker-ports", type=int, nargs="*")
@@ -48,21 +46,6 @@ def main():
     last_probed = None
     leader = None
 
-    if args.gateway_port is not None:
-        script_dir = Path(__file__).parent
-        j2_loader = jinja2.FileSystemLoader(script_dir)
-        j2_env = jinja2.Environment(loader=j2_loader)
-        nginx_conf_j2 = j2_env.get_template("nginx.conf.j2")
-
-        gateway_conf_path = Path(args.gateway_conf)
-
-        def update_conf():
-            conf_args = {"leader": leader, "gateway_port": args.gateway_port}
-            conf_txt = nginx_conf_j2.render(conf_args)
-            with open(gateway_conf_path, mode="w") as gateway_conf_f:
-                gateway_conf_f.write(conf_txt)
-            os.kill(args.gateway_pid, signal.SIGHUP)
-
     def elect_leader():
         while True:
             for addr in workers:
@@ -79,15 +62,18 @@ def main():
                         nonlocal leader
                         leader = data["leader"]
                         logging.info(f"Elected leader {leader}")
-                        if args.gateway_pid is not None:
-                            update_conf()
+                        if args.leader_url is not None:
+                            requests.put(
+                                args.leader_url,
+                                json={"leader": leader},
+                            )
                     return
                 except:
                     pass
 
             time.sleep(1.0)
 
-    if args.gateway_port is not None:
+    if args.leader_url is not None:
         elect_leader()
 
     def probe_thread_fn():
