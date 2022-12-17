@@ -59,8 +59,6 @@ def main():
         metavar=("MEAN", "MAX_DEV"),
     )
     p.add_argument("--ledger-file", required=True)
-    p.add_argument("--prober-port", type=int)
-    p.add_argument("--probe-period", type=float, required=True)
 
     g = p.add_mutually_exclusive_group()
     g.add_argument("--num-workers", type=int)
@@ -68,46 +66,30 @@ def main():
 
     p.add_argument("--gateway-port", type=int)
 
+    p.add_argument("-v", "--verbose", action="store_true")
+
     args = p.parse_args()
 
-    logging.basicConfig(level=logging.INFO)
+    logging.getLogger("werkzeug").setLevel(logging.WARN)
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARN)
 
     with reserved_sockets() as rsvd:
         if args.gateway_port is not None:
             gateway_sock = get_socket(port=args.gateway_port)
             rsvd.append(gateway_sock)
 
-        if args.prober_port is not None:
-            prober_sock = get_socket(port=args.prober_port)
-            rsvd.append(prober_sock)
-
         if args.worker_ports is not None:
             for worker_port in args.worker_ports:
                 worker_sock = get_socket(port=worker_port)
                 rsvd.append(worker_sock)
-
-        if args.prober_port is not None:
-            prober_port = args.prober_port
-        else:
-            prober_sock = get_socket()
-            prober_port = port_of_socket(prober_sock)
-            rsvd.append(prober_sock)
-
-        if args.worker_ports is not None:
             worker_ports = args.worker_ports
-        elif args.num_workers is not None:
+        else:
             worker_ports = []
             for _ in range(args.num_workers):
                 worker_sock = get_socket()
                 worker_ports.append(port_of_socket(worker_sock))
                 rsvd.append(worker_sock)
             worker_ports = sorted(worker_ports)
-        else:
-            worker_ports = []
-
-        flask_sock = get_socket()
-        flask_port = port_of_socket(flask_sock)
-        rsvd.append(flask_sock)
 
     def parse_bounds(bounds):
         if bounds is not None:
@@ -126,6 +108,11 @@ def main():
 
     ledger_file = Path(args.ledger_file).absolute()
 
+    worker_addrs = [f"http://localhost:{p}" for p in worker_ports]
+    other_addrs = {
+        port: {*worker_addrs} - {f"http://localhost:{port}"} for port in worker_ports
+    }
+
     def spawn_worker(port: int):
         return subprocess.Popen(
             [
@@ -136,10 +123,20 @@ def main():
                 str(port),
                 "--ledger-file",
                 str(ledger_file),
+                *(["-v"] if args.verbose else []),
+                "--other-nodes",
+                *other_addrs[port],
             ],
             stdin=DEVNULL,
             stdout=DEVNULL,
         )
+
+    workers = []
+    for port in worker_ports:
+        proc = spawn_worker(port)
+        workers.append({"port": port, "proc": proc, "alive": True})
+
+    logging.info(f"Workers: {worker_addrs}")
 
     if args.gateway_port is not None:
         gateway_conf = tempfile.NamedTemporaryFile(mode="w", delete=False)
@@ -151,52 +148,19 @@ def main():
 
         conf_txt = nginx_conf_j2.render(
             gateway_port=args.gateway_port,
-            leader=None,
+            worker_addrs=[addr[len("http://") :] for addr in worker_addrs],
         )
         gateway_conf.write(conf_txt)
         gateway_conf.close()
 
         gateway_proc = subprocess.Popen(
-            ["nginx", "-g", "'daemon off;'", "-c", gateway_conf.name],
-            stdin=DEVNULL,
+            ["nginx", "-g", "daemon off;", "-c", gateway_conf.name],
             stdout=DEVNULL,
             stderr=DEVNULL,
         )
 
         logging.info(f"Running gateway on http://localhost:{args.gateway_port}")
         logging.info(f"Gateway args: {gateway_proc.args}")
-
-    app = Flask(__name__)
-
-    class UpdateLeaderSchema(Schema):
-        leader = fields.Str()
-
-    @app.put("/leader")
-    def update_leader():
-        data = UpdateLeaderSchema().load(request.json)
-
-        conf_txt = nginx_conf_j2.render(
-            gateway_port=args.gateway_port,
-            leader=data["leader"],
-        )
-        with open(gateway_conf.name, "w") as conf_f:
-            conf_f.write(conf_txt)
-
-        os.kill(gateway_proc.pid, signal.SIGHUP)
-
-        return {}
-
-    def flask_fn():
-        sys.stdout = sys.stderr = open(os.devnull, "w")
-        app.run(use_reloader=False, debug=False, port=flask_port)
-
-    flask_proc = Process(target=flask_fn)
-    flask_proc.start()
-
-    workers = []
-    for port in worker_ports:
-        proc = spawn_worker(port)
-        workers.append({"port": port, "proc": proc, "alive": True})
 
     finishing = threading.Event()
     any_alive_cv = threading.Condition()
@@ -268,17 +232,6 @@ def main():
                 timer.cancel()
                 timer.join()
 
-    prober_argv = ["python3", "-m", "paxos.prober"]
-    prober_argv.extend(["--probe-period", str(args.probe_period)])
-    prober_argv.extend(["--port", str(prober_port)])
-    prober_argv.extend(["--worker-ports", *(str(w["port"]) for w in workers)])
-    if args.gateway_port is not None:
-        leader_url = f"http://localhost:{flask_port}/leader"
-        prober_argv.extend(["--leader-url", leader_url])
-
-    prober_proc = subprocess.Popen(prober_argv, stdout=DEVNULL, stdin=DEVNULL)
-    logging.info(f"Running prober on http://localhost:{prober_port}")
-
     killer = None
     if kill_every is not None:
         killer = Thread(target=killer_fn)
@@ -290,9 +243,6 @@ def main():
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, handler)
 
-    worker_addrs = [f"http://localhost:{w['port']}" for w in workers]
-    logging.info(f"Workers: {worker_addrs}")
-
     logging.info("Press Ctrl-C to stop all the processes.")
 
     finishing.wait()
@@ -300,12 +250,6 @@ def main():
     if args.gateway_port is not None:
         gateway_proc.kill()
         gateway_proc.wait()
-
-    prober_proc.terminate()
-    prober_proc.wait()
-
-    flask_proc.terminate()
-    flask_proc.join()
 
     if killer is not None:
         with any_alive_cv:

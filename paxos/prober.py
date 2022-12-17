@@ -19,9 +19,6 @@ from multiprocessing import Process
 from urllib.parse import urlparse, urljoin
 
 
-logging.basicConfig(level=logging.INFO)
-
-
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--probe-period", type=float, required=True)
@@ -30,10 +27,12 @@ def main():
     g = p.add_mutually_exclusive_group()
     g.add_argument("--workers", type=str, nargs="*")
     g.add_argument("--worker-ports", type=int, nargs="*")
+    p.add_argument("-v", "--verbose", action="store_true")
 
     args = p.parse_args()
 
     logging.getLogger("werkzeug").setLevel(logging.WARN)
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARN)
 
     if args.workers is not None:
         workers = args.workers
@@ -51,10 +50,9 @@ def main():
             for addr in workers:
                 other_nodes = list(workers)
                 other_nodes.remove(addr)
-                payload = {"other_nodes": other_nodes}
 
                 try:
-                    resp = requests.post(f"{addr}/admin/elect_leader", json=payload)
+                    resp = requests.post(f"{addr}/admin/elect_leader")
                     resp.raise_for_status()
 
                     data = resp.json()

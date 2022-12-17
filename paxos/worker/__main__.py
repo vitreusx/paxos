@@ -14,12 +14,17 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, required=True)
     p.add_argument("--ledger-file", required=True)
+    p.add_argument("--other-nodes", nargs="*")
+    p.add_argument("-v", "--verbose", action="store_true")
 
     args = p.parse_args()
+
+    other_nodes = args.other_nodes
 
     app = Flask(__name__)
 
     logging.getLogger("werkzeug").setLevel(logging.WARN)
+    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARN)
 
     ledger = FileLedger(fpath=Path(args.ledger_file))
 
@@ -80,13 +85,8 @@ def main():
     def healthcheck():
         return {}
 
-    class ElectLeaderSchema(Schema):
-        other_nodes = fields.List(fields.Str())
-
     @app.post("/admin/elect_leader")
     def elect_leader():
-        data = ElectLeaderSchema().load(request.json)
-        other_nodes: list[str] = data["other_nodes"]
         # TODO Implement this part (Basic Paxos)
         return {"leader": f"http://{request.host}"}
 
