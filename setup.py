@@ -11,5 +11,4 @@ setup(
     name="paxos",
     description="Package for DS project on distributed consensus with Paxos.",
     packages=find_packages(),
-    requires=requires(),
 )
