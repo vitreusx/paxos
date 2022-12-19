@@ -1,23 +1,15 @@
 import argparse
-import atexit
 import http
 import logging
-import os
 import random
-import signal
-import subprocess
-import tempfile
 import threading
 import time
-from multiprocessing import Process
-from pathlib import Path
 from threading import Thread
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
-import jinja2
 import requests
-from flask import Flask, g, jsonify, request
-from marshmallow import Schema, ValidationError, fields
+from flask import Flask, jsonify
+from marshmallow import ValidationError
 
 
 def main():

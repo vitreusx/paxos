@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 import random
-import shutil
 import signal
 import socket
 import subprocess
@@ -10,15 +9,13 @@ import sys
 import tempfile
 import threading
 import time
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from multiprocessing import Process
 from pathlib import Path
 from subprocess import DEVNULL
 from threading import Thread
-from urllib.parse import urlparse
 
 import jinja2
-import requests
 from flask import Flask, request
 from marshmallow import Schema, fields
 

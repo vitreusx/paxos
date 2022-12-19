@@ -1,6 +1,5 @@
 import argparse
 import http
-import io
 import shlex
 from urllib.parse import urljoin
 
