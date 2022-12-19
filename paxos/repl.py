@@ -1,11 +1,12 @@
-import prompt_toolkit as pt
-from prompt_toolkit.completion import WordCompleter
 import argparse
-from urllib.parse import urljoin
-import shlex
-import io
-import requests
 import http
+import io
+import shlex
+from urllib.parse import urljoin
+
+import prompt_toolkit as pt
+import requests
+from prompt_toolkit.completion import WordCompleter
 
 
 def main():
