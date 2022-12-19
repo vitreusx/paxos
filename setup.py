@@ -10,6 +10,15 @@ def requires():
 
 setup(
     name="paxos",
+    version="0.0.1-dev",
     description="Package for DS project on distributed consensus with Paxos.",
     packages=find_packages(),
+    install_requires=requires(),
+    extras_require={
+        "dev": [
+            "black>=22.12.0",
+            "isort>=5.11.3",
+            "mypy>=0.991",
+        ]
+    },
 )
