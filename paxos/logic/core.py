@@ -32,12 +32,12 @@ class Proposer:
         id = self.id_generator.new_id()
         self.messenger.send_prepare(PrepareMsg(id))
 
-    def recv_promise(self, promise: PromiseMsg, from_id: str):
+    def recv_promise(self, promise: PromiseMsg, from_uid: str):
         # ignore if we already got this or id is too old
-        if from_id in self.promises_rcvd or promise.id != self.proposal.id:
+        if from_uid in self.promises_rcvd or promise.id != self.proposal.id:
             return
 
-        self.promises_rcvd.add(from_id)
+        self.promises_rcvd.add(from_uid)
 
         if promise.accepted_id is not None and promise.accepted_id > self.proposal.id:
             self.proposal.id = promise.accepted_id
@@ -45,8 +45,12 @@ class Proposer:
 
         if len(self.promises_rcvd) >= self.quorum_size:
             self.messenger.send_accept(
-                AcceptMsg(self.proposal.id, self.proposal.value), from_id
+                AcceptMsg(self.proposal.id, self.proposal.value), from_uid
             )
+
+    def recv_accept(self, accept: AcceptMsg, from_uid: str):
+        # idk what to do now - imo only learners need to know this
+        pass
 
     def reset(self):
         self.proposal = None
@@ -60,7 +64,7 @@ class Acceptor:
         self.promised_id: int | None = None
         self.accepted_proposal: Proposal | None = None
 
-    def recv_prepare(self, prepare: PrepareMsg, from_id: str):
+    def recv_prepare(self, prepare: PrepareMsg, from_uid: str):
         # should we ignore this prepare msg?
         if self.promised_id is not None and prepare.id < self.promised_id:
             return
@@ -69,7 +73,7 @@ class Acceptor:
 
         # didnt accept anything yet
         if self.accepted_proposal is None:
-            self.messenger.send_promise(PromiseMsg(self.promised_id), from_id)
+            self.messenger.send_promise(PromiseMsg(self.promised_id), from_uid)
         else:
             self.messenger.send_promise(
                 PromiseMsg(
@@ -77,10 +81,10 @@ class Acceptor:
                     self.accepted_proposal.id,
                     self.accepted_proposal.value,
                 ),
-                from_id,
+                from_uid,
             )
 
-    def recv_accept_request(self, accept_request: AcceptRequestMsg, from_id: str):
+    def recv_accept_request(self, accept_request: AcceptRequestMsg, from_uid: str):
         # shold we ignore this msg?
         if self.promised_id is not None and accept_request.id < self.promised_id:
             return
@@ -88,7 +92,7 @@ class Acceptor:
         self.promised_id = accept_request.id
         self.accepted_proposal = Proposal(accept_request.id, accept_request.value)
         self.messenger.send_accept(
-            AcceptMsg(self.accepted_proposal.id, self.accepted_proposal.value), from_id
+            AcceptMsg(self.accepted_proposal.id, self.accepted_proposal.value), from_uid
         )
 
     def reset(self):
@@ -102,12 +106,12 @@ class Learner:
         self.messenger = messenger
         self.accept_store = AcceptStore(quorum_size)
 
-    def recv_accept(self, accept: AcceptMsg, from_id: str):
+    def recv_accept(self, accept: AcceptMsg, from_uid: str):
         # are we done?
         if self.accept_store.get_consensus_value() is not None:
             return
 
-        self.accept_store.add_new_proposal(accept, from_id)
+        self.accept_store.add_new_proposal(accept, from_uid)
 
         # if we reached consensus broadcast this info
         consensus_value = self.accept_store.get_consensus_value()
