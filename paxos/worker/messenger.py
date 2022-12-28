@@ -1,5 +1,7 @@
 from typing import List, Literal, Set
 
+from requests import post
+
 from paxos.logic.abstract import Messenger
 from paxos.logic.data import AcceptMsg, AcceptRequestMsg, Msg, PrepareMsg, PromiseMsg
 
@@ -18,27 +20,30 @@ class HttpMessenger(Messenger):
         self.learners = learners
 
     def _send(
-        self, message: Msg, host: str, role: Literal["proposer", "acceptor", "learner"]
+        self,
+        message: Msg,
+        address: str,
+        role: Literal["proposer", "acceptor", "learner"],
     ):
         if isinstance(message, AcceptMsg):
-            address = f"{host}/{role}/accept"
+            url = f"{address}/paxos/{role}/accept"
         elif isinstance(message, AcceptRequestMsg):
-            address = f"{host}/{role}/accept_request"
+            url = f"{address}/paxos/{role}/accept_request"
         elif isinstance(message, PrepareMsg):
-            address = f"{host}/{role}/prepare"
+            url = f"{address}/paxos/{role}/prepare"
         elif isinstance(message, PromiseMsg):
-            address = f"{host}/{role}/promise"
+            url = f"{address}/paxos/{role}/promise"
         else:
             raise ValueError(f"message {message} of invalid type")
 
         payload = message.to_json()
 
-        # TODO: actually send it
+        post(url=url, json=payload)
 
     def deactivate(self, address: str):
-        self.proposers.pop(address)
-        self.acceptors.pop(address)
-        self.learners.pop(address)
+        self.proposers.remove(address)
+        self.acceptors.remove(address)
+        self.learners.remove(address)
 
     def add(self, address: str, roles: List[str]):
         if "proposer" in roles:
