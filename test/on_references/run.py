@@ -1,6 +1,5 @@
+from test.on_references.test_messenger import DebugReferenceMessenger
 from typing import Dict
-
-from messenger import DebugReferenceMessenger
 
 from paxos.logic.core import Acceptor, Learner, Proposer
 from paxos.logic.helper import BasicIDGenerator
