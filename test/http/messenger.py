@@ -1,3 +1,4 @@
+from time import sleep
 from typing import Dict
 
 from paxos.logic.abstract import Messenger
@@ -5,7 +6,7 @@ from paxos.logic.core import Acceptor, Learner, Proposer
 from paxos.logic.data import AcceptMsg, AcceptRequestMsg, PrepareMsg, PromiseMsg
 
 
-class DebugReferenceMessenger(Messenger):
+class HttpMessenger(Messenger):
     def __init__(self, uid: int):
         self.uid = str(uid)
 
