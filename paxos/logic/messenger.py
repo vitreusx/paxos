@@ -31,6 +31,8 @@ class HttpMessenger(Messenger):
         else:
             raise ValueError(f"message {message} of invalid type")
 
+        payload = message.to_json()
+
         # TODO: actually send it
 
     def deactivate(self, address: str):
@@ -44,7 +46,7 @@ class HttpMessenger(Messenger):
         if "acceptor" in roles:
             self.acceptors.add(address)
         if "learner" in roles:
-            self.learner.add(address)
+            self.learners.add(address)
 
     def send_prepare(self, prepare: PrepareMsg):
         """send prepare to all acceptors"""
