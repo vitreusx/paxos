@@ -1,5 +1,4 @@
 from collections import defaultdict
-from typing import Dict, Set
 
 from paxos.logic.abstract import IDGenerator
 from paxos.logic.data import AcceptMsg
@@ -20,8 +19,8 @@ class AcceptStore:
     def __init__(self, quorum_size: int):
         self.quorum_size = quorum_size
 
-        self.acceptor_to_proposal_id: Dict[int, int] = {}
-        self.proposal_id_to_acceptors: Dict[int, Set[int]] = defaultdict(set)
+        self.acceptor_to_proposal_id: dict[int, int] = {}
+        self.proposal_id_to_acceptors: dict[int, set[int]] = defaultdict(set)
         self.consensus_value: str | None = None
 
     def __repr__(self) -> str:

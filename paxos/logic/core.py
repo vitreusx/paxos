@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Set
-
 from paxos.logic.abstract import IDGenerator, Messenger
 from paxos.logic.data import (
     AcceptMsg,
@@ -26,7 +24,7 @@ class Proposer:
         self.id_generator = id_generator
         self.messenger = messenger
         self.proposal: Proposal = Proposal(None, None)
-        self.promises_rcvd: Set[int] = set()
+        self.promises_rcvd: set[int] = set()
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(uid={self.uid})"
