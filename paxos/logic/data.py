@@ -9,8 +9,8 @@ class PrepareMsg:
 @dataclass
 class PromiseMsg:
     id: int
-    accepted_id: int | None
-    accepted_value: str | None
+    accepted_id: int | None = None
+    accepted_value: str | None = None
 
 
 @dataclass
