@@ -33,7 +33,6 @@ class Proposer:
         self.messenger.send_prepare(PrepareMsg(id))
 
     def recv_promise(self, promise: PromiseMsg, from_id: str):
-
         # ignore if we already got this or id is too old
         if from_id in self.promises_rcvd or promise.id != self.proposal.id:
             return
@@ -68,8 +67,10 @@ class Acceptor:
 
         self.promised_id = prepare.id
 
-        # have we accepted anything already?
-        if self.accepted_proposal is not None:
+        # didnt accept anything yet
+        if self.accepted_proposal is None:
+            self.messenger.send_promise(PromiseMsg(self.promised_id), from_id)
+        else:
             self.messenger.send_promise(
                 PromiseMsg(
                     self.promised_id,
@@ -78,8 +79,6 @@ class Acceptor:
                 ),
                 from_id,
             )
-        else:
-            self.messenger.send_promise(PromiseMsg(self.promised_id), from_id)
 
     def recv_accept_request(self, accept_request: AcceptRequestMsg, from_id: str):
         # shold we ignore this msg?
