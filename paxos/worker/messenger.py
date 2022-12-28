@@ -1,4 +1,4 @@
-from typing import List, Literal, Set
+from typing import Literal
 
 from requests import post
 
@@ -10,9 +10,9 @@ class HttpMessenger(Messenger):
     def __init__(
         self,
         uid: str,
-        proposers: Set[str],
-        acceptors: Set[str],
-        learners: Set[str],
+        proposers: dict[int, str],
+        acceptors: dict[int, str],
+        learners: dict[int, str],
     ):
         self.uid = uid
         self.proposers = proposers
@@ -22,17 +22,18 @@ class HttpMessenger(Messenger):
     def _send(
         self,
         message: Msg,
+        from_uid: int,
         address: str,
         role: Literal["proposer", "acceptor", "learner"],
     ):
         if isinstance(message, AcceptMsg):
-            url = f"{address}/paxos/{role}/accept"
+            url = f"{address}/paxos/{role}/accept/{from_uid}"
         elif isinstance(message, AcceptRequestMsg):
-            url = f"{address}/paxos/{role}/accept_request"
+            url = f"{address}/paxos/{role}/accept_request/{from_uid}"
         elif isinstance(message, PrepareMsg):
-            url = f"{address}/paxos/{role}/prepare"
+            url = f"{address}/paxos/{role}/prepare/{from_uid}"
         elif isinstance(message, PromiseMsg):
-            url = f"{address}/paxos/{role}/promise"
+            url = f"{address}/paxos/{role}/promise/{from_uid}"
         else:
             raise ValueError(f"message {message} of invalid type")
 
@@ -40,45 +41,47 @@ class HttpMessenger(Messenger):
 
         post(url=url, json=payload)
 
-    def deactivate(self, address: str):
-        self.proposers.remove(address)
-        self.acceptors.remove(address)
-        self.learners.remove(address)
+    def deactivate(self, uid: int):
+        self.proposers.pop(uid)
+        self.acceptors.pop(uid)
+        self.learners.pop(uid)
 
-    def add(self, address: str, roles: List[str]):
+    def add(self, uid: int, address: str, roles: list[str]):
         if "proposer" in roles:
-            self.proposers.add(address)
+            self.proposers[uid] = address
         if "acceptor" in roles:
-            self.acceptors.add(address)
+            self.acceptors[uid] = address
         if "learner" in roles:
-            self.learners.add(address)
+            self.learners[uid] = address
 
     def send_prepare(self, prepare: PrepareMsg):
         """send prepare to all acceptors"""
-        for acceptor_addr in self.acceptors:
-            self._send(prepare, acceptor_addr, "acceptor")
+        for uid, addr in self.acceptors.items():
+            self._send(prepare, uid, addr, "acceptor")
 
-    def send_promise(self, promise: PromiseMsg, proposer_addr: str):
+    def send_promise(self, promise: PromiseMsg, proposer_uid: int):
         """send promise to specified proposer"""
-        if proposer_addr not in self.proposers:
-            raise ValueError(f"{proposer_addr} unknown")
-        self._send(promise, proposer_addr, "proposer")
+        if proposer_uid not in self.proposers.keys():
+            raise ValueError(f"{proposer_uid} unknown")
+        addr = self.proposers[proposer_uid]
+        self._send(promise, proposer_uid, addr, "proposer")
 
     def send_accept_request(self, accept_request: AcceptRequestMsg):
         """send accept request to all acceptors"""
-        for acceptor_addr in self.acceptors:
-            self._send(accept_request, acceptor_addr, "acceptor")
+        for uid, addr in self.acceptors.items():
+            self._send(accept_request, uid, addr, "acceptor")
 
-    def send_accept(self, accept: AcceptMsg, proposer_addr: str):
+    def send_accept(self, accept: AcceptMsg, proposer_uid: int):
         """send accept to proposer and all learners"""
-        if proposer_addr not in self.proposers:
-            raise ValueError(f"{proposer_addr} unknown")
+        if proposer_uid not in self.proposers.keys():
+            raise ValueError(f"{proposer_uid} unknown")
 
-        if proposer_addr not in self.learners:
-            self._send(accept, proposer_addr, "proposer")
+        if proposer_uid not in self.learners.keys():
+            addr = self.proposers[proposer_uid]
+            self._send(accept, proposer_uid, addr, "proposer")
 
-        for learner_addr in self.learners:
-            self._send(accept, learner_addr, "learner")
+        for uid, addr in self.learners.items():
+            self._send(accept, uid, addr, "learner")
 
     def send_consensus_reached(self, value: str):
         """inform everyone about the consensus value"""
