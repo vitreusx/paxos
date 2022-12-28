@@ -16,7 +16,7 @@ from paxos.logic.helper import AcceptStore
 class Proposer:
     def __init__(
         self,
-        uid: str,
+        uid: int,
         quorum_size: int,
         id_generator: IDGenerator,
         messenger: Messenger,
@@ -26,7 +26,7 @@ class Proposer:
         self.id_generator = id_generator
         self.messenger = messenger
         self.proposal: Proposal = Proposal(None, None)
-        self.promises_rcvd: Set[str] = set()
+        self.promises_rcvd: Set[int] = set()
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(uid={self.uid})"
@@ -40,7 +40,7 @@ class Proposer:
         self.proposal.id = id
         self.messenger.send_prepare(PrepareMsg(id))
 
-    def recv_promise(self, promise: PromiseMsg, from_uid: str):
+    def recv_promise(self, promise: PromiseMsg, from_uid: int):
         # ignore if we already got this
         if from_uid in self.promises_rcvd:
             return
@@ -60,7 +60,7 @@ class Proposer:
                 AcceptRequestMsg(self.proposal.id, self.proposal.value)
             )
 
-    def recv_accept(self, accept: AcceptMsg, from_uid: str):
+    def recv_accept(self, accept: AcceptMsg, from_uid: int):
         # idk what to do now - imo only learners need to know this
         pass
 
@@ -70,7 +70,7 @@ class Proposer:
 
 
 class Acceptor:
-    def __init__(self, uid: str, quorum_size: int, messenger: Messenger):
+    def __init__(self, uid: int, quorum_size: int, messenger: Messenger):
         self.uid = uid
         self.quorum_size = quorum_size
         self.messenger = messenger
@@ -80,7 +80,7 @@ class Acceptor:
     def __repr__(self) -> str:
         return f"{type(self).__name__}(uid={self.uid})"
 
-    def recv_prepare(self, prepare: PrepareMsg, from_uid: str):
+    def recv_prepare(self, prepare: PrepareMsg, from_uid: int):
         # should we ignore this prepare msg?
         if self.promised_id is not None and prepare.id < self.promised_id:
             return
@@ -100,7 +100,7 @@ class Acceptor:
                 from_uid,
             )
 
-    def recv_accept_request(self, accept_request: AcceptRequestMsg, from_uid: str):
+    def recv_accept_request(self, accept_request: AcceptRequestMsg, from_uid: int):
         # shold we ignore this msg?
         if self.promised_id is not None and accept_request.id < self.promised_id:
             return
@@ -117,7 +117,7 @@ class Acceptor:
 
 
 class Learner:
-    def __init__(self, uid: str, quorum_size: int, messenger: Messenger):
+    def __init__(self, uid: int, quorum_size: int, messenger: Messenger):
         self.uid = uid
         self.quorum_size = quorum_size
         self.messenger = messenger
@@ -126,7 +126,7 @@ class Learner:
     def __repr__(self) -> str:
         return f"{type(self).__name__}(uid={self.uid})"
 
-    def recv_accept(self, accept: AcceptMsg, from_uid: str):
+    def recv_accept(self, accept: AcceptMsg, from_uid: int):
         # are we done?
         if self.accept_store.get_consensus_value() is not None:
             return

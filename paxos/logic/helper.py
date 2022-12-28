@@ -20,8 +20,8 @@ class AcceptStore:
     def __init__(self, quorum_size: int):
         self.quorum_size = quorum_size
 
-        self.acceptor_to_proposal_id: Dict[str, int] = {}
-        self.proposal_id_to_acceptors: Dict[int, Set[str]] = defaultdict(set)
+        self.acceptor_to_proposal_id: Dict[int, int] = {}
+        self.proposal_id_to_acceptors: Dict[int, Set[int]] = defaultdict(set)
         self.consensus_value: str | None = None
 
     def __repr__(self) -> str:
@@ -30,7 +30,7 @@ class AcceptStore:
     def get_last_proposal_id(self, from_uid: int) -> int | None:
         return self.acceptor_to_proposal_id.get(from_uid)
 
-    def add_new_proposal(self, accept: AcceptMsg, from_uid: str):
+    def add_new_proposal(self, accept: AcceptMsg, from_uid: int):
         last_proposal_id = self.get_last_proposal_id(from_uid)
         # remove previous declaration
         if last_proposal_id is not None:

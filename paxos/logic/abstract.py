@@ -6,8 +6,7 @@ from paxos.logic.data import AcceptMsg, AcceptRequestMsg, PrepareMsg, PromiseMsg
 class IDGenerator(ABC):
     @abstractmethod
     def new_id(self) -> int:
-        self.last_id += self.num_overall
-        return self.last_id
+        pass
 
 
 class Messenger(ABC):
@@ -16,7 +15,7 @@ class Messenger(ABC):
         """send prepare to all acceptors"""
 
     @abstractmethod
-    def send_promise(self, promise: PromiseMsg, proposer_uid: str):
+    def send_promise(self, promise: PromiseMsg, proposer_uid: int):
         """send promise to specified proposer"""
 
     @abstractmethod
@@ -24,7 +23,7 @@ class Messenger(ABC):
         """send accept request to all acceptors"""
 
     @abstractmethod
-    def send_accept(self, accept: AcceptMsg, proposer_uid: str):
+    def send_accept(self, accept: AcceptMsg, proposer_uid: int):
         """send accept to proposer and all learners"""
 
     @abstractmethod
