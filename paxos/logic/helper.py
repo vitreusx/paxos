@@ -24,6 +24,9 @@ class AcceptStore:
         self.proposal_id_to_acceptors: Dict[int, Set[str]] = defaultdict(set)
         self.consensus_value: str | None = None
 
+    def __repr__(self) -> str:
+        return f'AcceptStore(prop_id -> acceptors: {dict(self.proposal_id_to_acceptors)}, consensus_val={self.consensus_value})'
+
     def get_last_proposal_id(self, from_uid: int) -> int | None:
         return self.acceptor_to_proposal_id.get(from_uid)
 
@@ -39,7 +42,7 @@ class AcceptStore:
         self.proposal_id_to_acceptors[accept.id].add(from_uid)
 
         # check for consensus
-        if len(self.proposal_id_to_acceptors) >= self.quorum_size:
+        if len(self.proposal_id_to_acceptors[accept.id]) >= self.quorum_size:
             self.consensus_value = accept.value
 
     def get_consensus_value(self) -> str | None:
