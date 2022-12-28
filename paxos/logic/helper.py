@@ -25,7 +25,7 @@ class AcceptStore:
         self.consensus_value: str | None = None
 
     def __repr__(self) -> str:
-        return f'AcceptStore(prop_id -> acceptors: {dict(self.proposal_id_to_acceptors)}, consensus_val={self.consensus_value})'
+        return f"AcceptStore(prop_id -> acceptors: {dict(self.proposal_id_to_acceptors)}, consensus_val={self.consensus_value})"
 
     def get_last_proposal_id(self, from_uid: int) -> int | None:
         return self.acceptor_to_proposal_id.get(from_uid)

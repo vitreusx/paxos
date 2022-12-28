@@ -137,3 +137,6 @@ class Learner:
         consensus_value = self.accept_store.get_consensus_value()
         if consensus_value is not None:
             self.messenger.send_consensus_reached(consensus_value)
+
+    def reset(self):
+        self.accept_store.reset()
