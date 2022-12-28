@@ -16,7 +16,7 @@ class Messenger(ABC):
         """send prepare to all acceptors"""
 
     @abstractmethod
-    def send_promise(self, promise: PromiseMsg, to_proposer: str):
+    def send_promise(self, promise: PromiseMsg, proposer_uid: str):
         """send promise to specified proposer"""
 
     @abstractmethod
@@ -24,7 +24,7 @@ class Messenger(ABC):
         """send accept request to all acceptors"""
 
     @abstractmethod
-    def send_accept(self, accept: AcceptMsg, to_proposer: str):
+    def send_accept(self, accept: AcceptMsg, proposer_uid: str):
         """send accept to proposer and all learners"""
 
     @abstractmethod
