@@ -9,7 +9,7 @@ from paxos.logic.data import AcceptMsg, AcceptRequestMsg, Msg, PrepareMsg, Promi
 class HttpMessenger(Messenger):
     def __init__(
         self,
-        uid: str,
+        uid: int,
         proposers: dict[int, str],
         acceptors: dict[int, str],
         learners: dict[int, str],
