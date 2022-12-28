@@ -27,5 +27,5 @@ class AcceptMsg:
 
 @dataclass
 class Proposal:
-    id: int
-    value: str
+    id: int | None
+    value: str | None
