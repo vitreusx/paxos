@@ -21,6 +21,10 @@ from marshmallow import Schema, fields
 
 
 def get_socket(host="", port=0):
+    """Get a socket.
+    :param host: Hostname, pass "" for localhost.
+    :param port: Port to bind, pass 0 to pick free port."""
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((host, port))
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -28,11 +32,13 @@ def get_socket(host="", port=0):
 
 
 def port_of_socket(sock: socket.socket):
+    """Get port for the socket."""
     return sock.getsockname()[1]
 
 
 @contextmanager
 def reserved_sockets():
+    """Maintain a list of sockets, and free them upon leaving context. Useful when trying to RSVP a bunch of free ports."""
     try:
         sockets = []
         yield sockets
@@ -70,9 +76,11 @@ def main():
 
     args = p.parse_args()
 
+    # Set up the logger - by default INFO-level stuff is suppressed.
     logging.getLogger("werkzeug").setLevel(logging.WARN)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARN)
 
+    comm_ports = []
     with reserved_sockets() as rsvd:
         if args.gateway_port is not None:
             gateway_sock = get_socket(port=args.gateway_port)
@@ -105,7 +113,13 @@ def main():
             worker_ports = sorted(worker_ports)
         else:
             worker_ports = []
-
+        
+        for _ in worker_ports:
+            comm_sock = get_socket()
+            comm_port = port_of_socket(comm_sock)
+            rsvd.append(comm_sock)
+            comm_ports.append(comm_port)
+        
         flask_sock = get_socket()
         flask_port = port_of_socket(flask_sock)
         rsvd.append(flask_sock)
@@ -138,7 +152,7 @@ def main():
                 "python3",
                 "-m",
                 "paxos.worker",
-                "--port",
+                "--flask-port",
                 str(port),
                 "--ledger-file",
                 str(ledger_file),

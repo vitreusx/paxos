@@ -1,2 +1,2 @@
 #!/usr/bin/sh
-pkill -f paxos.worker
+pkill -9 -f "python3 -m paxos."
