@@ -5,12 +5,12 @@ import subprocess
 from subprocess import DEVNULL
 
 class PaxosWorker(AbstractWorker):
-    def __init__(self, flask_port: int, comm_port: int, ledger_file: Union[str, Path], others: List[str],verbose: bool):
+    def __init__(self, flask_port: int, comm_port: int, ledger_file: Union[str, Path], comm_net: List[str], verbose: bool):
         super().__init__()
         self.flask_port = flask_port
         self.comm_port = comm_port
         self.ledger_file = Path(ledger_file).absolute()
-        self.others = others
+        self.comm_net = comm_net
         self.verbose = verbose
         self._proc = None
     
@@ -25,7 +25,7 @@ class PaxosWorker(AbstractWorker):
             args.extend(["--flask-port", str(self.flask_port)])
             args.extend(["--comm-port", str(self.comm_port)])
             args.extend(["--ledger-file", str(self.ledger_file)])
-            args.extend(["--others", *self.others])
+            args.extend(["--comm-net", *self.comm_net])
             if self.verbose:
                 args.extend(["-v"])
             

@@ -66,10 +66,9 @@ class WithLeader:
 
     def create_workers(self):
         self.workers = []
-        for i, (flask_p, comm_p) in \
-                enumerate(zip(self.flask_ports, self.comm_ports)):
-            others = [f"localhost:{p}" for j, p in enumerate(self.comm_ports) if j != i]
-            worker = PaxosWorker(flask_p, comm_p, self.args.ledger_file, others, self.args.verbose)
+        comm_net = [f"localhost:{p}" for p in self.comm_ports]
+        for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
+            worker = PaxosWorker(flask_p, comm_p, self.args.ledger_file, comm_net, self.args.verbose)
             self.workers.append(worker)
             worker.respawn()
 
