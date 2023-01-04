@@ -1,22 +1,15 @@
-import threading
-from threading import Thread
 import argparse
-import random
-import time
-import requests
-import jinja2
-from pathlib import Path
-import os
-import signal
-from flask import Flask, request, jsonify, g
-from marshmallow import Schema, fields, ValidationError
 import http
-import tempfile
-import subprocess
-import atexit
 import logging
-from multiprocessing import Process
-from urllib.parse import urlparse, urljoin
+import random
+import threading
+import time
+from threading import Thread
+from urllib.parse import urljoin
+
+import requests
+from flask import Flask, jsonify
+from marshmallow import ValidationError
 
 
 def main():

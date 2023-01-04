@@ -1,25 +1,23 @@
 import argparse
-import socket
-from contextlib import closing, contextmanager
-import subprocess
-from subprocess import DEVNULL
 import logging
-import threading
-from threading import Thread
-import time
+import os
 import random
-from pathlib import Path
 import signal
+import socket
+import subprocess
+import sys
 import tempfile
-import requests
-import shutil
+import threading
+import time
+from contextlib import contextmanager
+from multiprocessing import Process
+from pathlib import Path
+from subprocess import DEVNULL
+from threading import Thread
+
 import jinja2
-from urllib.parse import urlparse
 from flask import Flask, request
 from marshmallow import Schema, fields
-import os
-from multiprocessing import Process
-import sys
 
 
 def get_socket(host="", port=0):
