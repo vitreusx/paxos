@@ -161,5 +161,8 @@ cython_debug/
 
 ledger.yml
 
-#vscode
+# vscode
 .vscode/
+
+# mypy
+mypy.ini
