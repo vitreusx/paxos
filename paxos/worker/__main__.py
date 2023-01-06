@@ -8,7 +8,8 @@ from flask import Flask, jsonify, request
 from marshmallow import Schema, ValidationError, fields
 import signal
 from .ledger import FileLedger, LedgerError
-from . import paxos
+from paxos.logic.comm import Network
+from paxos.logic.kvstore import KeyValueStore
 import asyncio
 
 
@@ -23,6 +24,7 @@ class Worker:
         p.add_argument("--comm-port", type=int, required=True)
         p.add_argument("--ledger-file", required=True)
         p.add_argument("--comm-net", nargs="*")
+        p.add_argument("--paxos-dir", required=True)
         p.add_argument("-v", "--verbose", action="store_true")
 
         return p.parse_args()
@@ -115,10 +117,12 @@ class Worker:
         return app
 
     def make_comm_server(self):
-        net = paxos.Network.from_addrs(self.args.comm_net)
         addr = f"localhost:{self.args.comm_port}"
-        self.kv_store = paxos.KeyValueStore(net, addr)
-        return self.kv_store.UDP_Server()
+        net = Network.from_addresses(self.args.comm_net, addr)
+        save_path = Path(self.args.paxos_dir) / f"{net.me.id}.pkl"
+        paxos_log = logging.getLogger(f"paxos-{net.me.id}").info
+        self.kv_store = KeyValueStore(net, save_path=save_path, log=paxos_log)
+        return self.kv_store.UDP_KV_Server()
 
     def main(self):
         self.args = self.parse_args()
@@ -136,7 +140,6 @@ class Worker:
         )
 
         def comm_thr_fn():
-            loop = asyncio.get_running_loop
             with self.make_comm_server() as srv:
                 srv.serve_forever()
 

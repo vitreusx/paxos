@@ -1,15 +1,9 @@
 from __future__ import annotations
-
-import os
-import shutil
-import tempfile
-from copy import deepcopy
 from dataclasses import asdict, dataclass
 from decimal import Decimal
-from functools import wraps
 from pathlib import Path
 from typing import Dict, Union
-
+from paxos.utils.atomic import AtomicMixin, atomic, atomic_save
 from dacite.config import Config
 from dacite.core import from_dict
 from ruamel.yaml import YAML
@@ -17,40 +11,6 @@ from ruamel.yaml import YAML
 
 class LedgerError(Exception):
     pass
-
-
-class AtomicMixin:
-    def __init__(self):
-        self.in_tx = False
-        self.prev_state = None
-
-    def commit(self):
-        pass
-
-    def restore(self):
-        pass
-
-
-def atomic(method):
-    @wraps(method)
-    def atomic_func(self, *args, **kwargs):
-        nested_tx = self.in_tx
-        if not nested_tx:
-            self.prev_state = deepcopy(self)
-            self.in_tx = True
-
-        try:
-            retval = method(self, *args, **kwargs)
-            if not nested_tx:
-                self.commit()
-                self.in_tx = False
-
-            return retval
-        except Exception as e:
-            self.restore()
-            raise e
-
-    return atomic_func
 
 
 @dataclass
@@ -136,10 +96,5 @@ class FileLedger(Ledger):
 
     def commit(self):
         super().commit()
-
         data = asdict(self)
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmpfile:
-            yaml.dump(data, tmpfile)
-            tmpfile.flush()
-            os.fsync(tmpfile.fileno())
-            shutil.move(tmpfile.name, self.fpath)
+        atomic_save(yaml.dump(data), self.fpath)

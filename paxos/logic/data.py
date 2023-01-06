@@ -1,40 +1,33 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
-from dataclasses_json import dataclass_json
 
-
-@dataclass_json
 @dataclass
-class PrepareMsg:
+class Request:
+    value: Any
+
+
+@dataclass
+class Prepare:
     id: int
 
 
-@dataclass_json
 @dataclass
-class PromiseMsg:
+class Accepted:
     id: int
-    accepted_id: int | None = None
-    accepted_value: str | None = None
+    value: Any
 
 
-@dataclass_json
 @dataclass
-class AcceptRequestMsg:
+class Promise:
     id: int
-    value: str
+    prev: Accepted | None
 
 
-@dataclass_json
 @dataclass
-class AcceptMsg:
+class Accept:
     id: int
-    value: str
+    value: Any
 
 
-@dataclass
-class Proposal:
-    id: int | None
-    value: str | None
-
-
-Msg = PrepareMsg | PromiseMsg | AcceptRequestMsg | AcceptMsg
+PaxosMsg = Request | Prepare | Promise | Accept | Accepted

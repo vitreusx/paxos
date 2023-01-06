@@ -18,6 +18,7 @@ import threading
 import sys
 from multiprocessing import Process
 
+
 class WithLeader:
     def parse_args(self):
         p = argparse.ArgumentParser()
@@ -54,9 +55,9 @@ class WithLeader:
             if self.args.gateway_port is not None:
                 sset.reserve(port=self.args.gateway_port)
                 _, self.flask_port = sset.reserve()
-            
+
             _, self.prober_port = sset.reserve(port=self.args.prober_port)
-            
+
             self.flask_ports, self.comm_ports = [], []
             for _ in range(self.args.num_workers):
                 _, flask_port = sset.reserve()
@@ -67,8 +68,16 @@ class WithLeader:
     def create_workers(self):
         self.workers = []
         comm_net = [f"localhost:{p}" for p in self.comm_ports]
+        self.paxos_dir = tempfile.TemporaryDirectory()
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
-            worker = PaxosWorker(flask_p, comm_p, self.args.ledger_file, comm_net, self.args.verbose)
+            worker = PaxosWorker(
+                flask_p,
+                comm_p,
+                self.args.ledger_file,
+                comm_net,
+                self.args.verbose,
+                self.paxos_dir.name,
+            )
             self.workers.append(worker)
             worker.respawn()
 
@@ -80,27 +89,27 @@ class WithLeader:
         j2_env = jinja2.Environment(loader=j2_loader)
         self.nginx_conf_j2 = j2_env.get_template("nginx.conf.j2")
 
-        self.gateway_conf.write(self.nginx_conf_j2.render(
-            gateway_port=self.args.gateway_port,
-            leader=None,
-        ))
+        self.gateway_conf.write(
+            self.nginx_conf_j2.render(
+                gateway_port=self.args.gateway_port,
+                leader=None,
+            )
+        )
         self.gateway_conf.close()
 
         self.gateway = subprocess.Popen(
-            ["nginx", "-g", "daemon off;", "-c", self.gateway_conf.name],
-            stdout=DEVNULL
+            ["nginx", "-g", "daemon off;", "-c", self.gateway_conf.name], stdout=DEVNULL
         )
-    
+
     def update_gateway(self, leader):
         conf_txt = self.nginx_conf_j2.render(
-            gateway_port=self.args.gateway_port,
-            leader=leader
+            gateway_port=self.args.gateway_port, leader=leader
         )
         with open(self.gateway_conf.name, "w") as conf_f:
             conf_f.write(conf_txt)
 
         os.kill(self.gateway.pid, signal.SIGHUP)
-    
+
     def create_flask_app(self):
         app = Flask(__name__)
 
@@ -112,30 +121,30 @@ class WithLeader:
             data = UpdateLeaderSchema().load(request.json)
             self.update_gateway(data["leader"])
             return {}
-        
+
         def flask_proc_fn():
             sys.stdout = open(os.devnull, "w")
             app.run(use_reloader=False, debug=False, port=self.flask_port)
-        
+
         self.flask_srv = Process(target=flask_proc_fn)
         self.flask_srv.start()
-    
+
     def get_delay_rv(self, params: List[float]):
         if len(params) > 1:
             mean, max_dev = params[:2]
-            loc, scale = mean-max_dev, 2*max_dev
+            loc, scale = mean - max_dev, 2 * max_dev
         else:
             val = params[0]
             loc, scale = val, 0.0
         return scipy.stats.uniform(loc=loc, scale=scale)
-    
+
     def create_killer(self):
         kill_every = self.get_delay_rv(self.args.kill_every)
         if self.args.restart_after is not None:
             restart_after = self.get_delay_rv(self.args.restart_after)
         else:
             restart_after = None
-        
+
         self.killer = Killer(self.workers, self.finishing, kill_every, restart_after)
         self.killer.start()
 
@@ -155,7 +164,7 @@ class WithLeader:
     def setup_signals(self):
         def handler(signo, frame):
             self.finishing.set()
-        
+
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, handler)
 
@@ -169,10 +178,10 @@ class WithLeader:
 
             self.gateway.terminate()
             self.gateway.wait()
-        
+
         if self.args.kill_every is not None:
             self.killer.join()
-        
+
         for worker in self.workers:
             worker.kill()
 
@@ -187,20 +196,21 @@ class WithLeader:
         if self.args.gateway_port is not None:
             self.create_gateway()
             self.create_flask_app()
-        
+
         self.create_workers()
 
         self.create_prober()
 
         if self.args.kill_every is not None:
             self.create_killer()
-        
+
         self.setup_signals()
 
         self.finishing.wait()
 
         self.cleanup()
 
+
 if __name__ == "__main__":
     app = WithLeader()
-    app.main() 
+    app.main()
