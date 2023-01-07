@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from paxos.logic.communication import Communicator, RoleBehavior
+from paxos.logic.communication import Communicator, NodeID, RoleBehavior
 from paxos.logic.data import Accept, Accepted, PaxosMsg, Prepare, Promise, Request
 
 
@@ -9,8 +9,8 @@ from paxos.logic.data import Accept, Accepted, PaxosMsg, Prepare, Promise, Reque
 class Proposal:
     id: int
     value: Any
-    acceptor_ids: set[int] = field(default_factory=lambda: set())
-    prev_accepted: list[Accepted] = field(default_factory=lambda: [])
+    acceptor_ids: set[int] = field(default_factory=set)
+    prev_accepted: set[Accepted] = field(default_factory=set)
 
 
 class Proposer(RoleBehavior):
@@ -41,7 +41,7 @@ class Proposer(RoleBehavior):
         self.proposal.acceptor_ids.add(acceptor)
 
         if promise.prev is not None:
-            self.proposal.prev_accepted.append(promise.prev)
+            self.proposal.prev_accepted.add(promise.prev)
 
         if len(self.proposal.acceptor_ids) >= self.quorum_size:
             if len(self.proposal.prev_accepted) > 0:
@@ -58,7 +58,7 @@ class Proposer(RoleBehavior):
     def recv_accepted(self, accepted: Accepted):
         pass
 
-    def on_recv(self, sender: int, message: PaxosMsg):
+    def on_recv(self, sender: NodeID, message: PaxosMsg):
         if isinstance(message, Request):
             self.recv_request(message)
         elif isinstance(message, Promise):
@@ -81,7 +81,7 @@ class Acceptor(RoleBehavior):
         self.promised_id: int | None = None
         self.accepted: Accepted | None = None
 
-    def recv_prepare(self, proposer: int, prepare: Prepare):
+    def recv_prepare(self, proposer: NodeID, prepare: Prepare):
         if self.promised_id is not None and prepare.id < self.promised_id:
             return
 
@@ -89,7 +89,7 @@ class Acceptor(RoleBehavior):
         promise = Promise(self.promised_id, self.accepted)
         self.comm.send(promise, [proposer])
 
-    def recv_accept(self, proposer: int, accept: Accept):
+    def recv_accept(self, proposer: NodeID, accept: Accept):
         if self.promised_id is not None and accept.id < self.promised_id:
             return
 
@@ -97,7 +97,7 @@ class Acceptor(RoleBehavior):
         self.accepted = Accepted(accept.id, accept.value)
         self.comm.send(self.accepted, [proposer, *self.comm.learners])
 
-    def on_recv(self, sender: int, message: PaxosMsg):
+    def on_recv(self, sender: NodeID, message: PaxosMsg):
         if isinstance(message, Prepare):
             self.recv_prepare(sender, message)
         elif isinstance(message, Accept):
@@ -122,7 +122,7 @@ class Learner(RoleBehavior):
         self.value = accepted.value
         self.has_value = True
 
-    def on_recv(self, sender: int, message: PaxosMsg):
+    def on_recv(self, sender: NodeID, message: PaxosMsg):
         if isinstance(message, Accepted):
             self.recv_accepted(message)
 
