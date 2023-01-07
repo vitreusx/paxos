@@ -14,7 +14,7 @@ from paxos.utils.atomic import atomic_save
 
 @dataclass
 class Payload:
-    sender: int
+    sender: NodeID
     key: Any
     message: PaxosMsg
 
@@ -36,7 +36,7 @@ class UDP_KV_Comm(Communicator):
                 port = int(port)
                 sock.sendto(data, (host, port))
 
-    def all_of(self, role: Role) -> Iterable[NodeID]:
+    def all_of(self, role: Role) -> list[NodeID]:
         return [node.id for node in self.net.all_of(role)]
 
 
