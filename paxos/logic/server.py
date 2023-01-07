@@ -1,5 +1,5 @@
-from .comm import *
-from .roles import *
+from paxos.logic.communication import Communicator, Role
+from paxos.logic.roles import Acceptor, Learner, Proposer
 
 
 class PaxosServer:

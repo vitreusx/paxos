@@ -1,8 +1,7 @@
-from contextlib import contextmanager
 import socket
 
 
-class SocketSet:    
+class SocketSet:
     def reserve(self, host="", port=None):
         if port is None:
             port = 0
@@ -12,7 +11,7 @@ class SocketSet:
         self.sockets.append(sock)
         sock_port = sock.getsockname()[1]
         return sock, sock_port
-    
+
     def __enter__(self):
         self.sockets = []
         return self

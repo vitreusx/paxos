@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
-from .comm import *
-from .data import *
+from typing import Any
+
+from paxos.logic.communication import Communicator, RoleBehavior
+from paxos.logic.data import Accept, Accepted, PaxosMsg, Prepare, Promise, Request
 
 
 @dataclass
