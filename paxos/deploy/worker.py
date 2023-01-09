@@ -1,8 +1,9 @@
-from .killer import AbstractWorker
-from pathlib import Path
-from typing import List, Union
 import subprocess
+from pathlib import Path
 from subprocess import DEVNULL
+from typing import List, Union
+
+from paxos.deploy.killer import AbstractWorker
 
 
 class PaxosWorker(AbstractWorker):

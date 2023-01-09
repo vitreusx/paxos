@@ -1,18 +1,20 @@
-from .comm import *
-from .server import *
-import socket
-import pickle
-from pathlib import Path
-import socketserver
-from typing import Optional
-from threading import Event
-from paxos.utils.atomic import *
 import asyncio
+import pickle
+import socket
+import socketserver
+from dataclasses import dataclass
+from pathlib import Path
+from threading import Event
+from typing import Any, Iterable
+
+from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
+from paxos.logic.server import PaxosServer
+from paxos.utils.atomic import atomic_save
 
 
 @dataclass
 class Payload:
-    sender: int
+    sender: NodeID
     key: Any
     message: PaxosMsg
 
@@ -34,7 +36,7 @@ class UDP_KV_Comm(Communicator):
                 port = int(port)
                 sock.sendto(data, (host, port))
 
-    def all_of(self, role: Role) -> Iterable[NodeID]:
+    def all_of(self, role: Role) -> list[NodeID]:
         return [node.id for node in self.net.all_of(role)]
 
 

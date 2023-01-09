@@ -1,9 +1,11 @@
 from __future__ import annotations
-from .data import *
-from abc import ABC, abstractmethod
-from typing import Iterable, List
-from enum import Enum
 
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
+from typing import Iterable, List
+
+from paxos.logic.data import PaxosMsg
 
 NodeID = int
 Address = str
@@ -74,7 +76,7 @@ class Network:
         nodes = {uid: Node(uid, addr, all_roles) for addr, uid in addrs_ids}
         return Network(nodes, nodes[my_id])
 
-    def all_of(self, role: Role):
+    def all_of(self, role: Role) -> Iterable[Node]:
         return [node for node in self.nodes.values() if role in node.roles]
 
     def __getitem__(self, uid: NodeID) -> Node:
@@ -88,5 +90,5 @@ class RoleBehavior(ABC):
     """Behavior for a given role in the Paxos protocol."""
 
     @abstractmethod
-    def on_recv(self, sender: int, message: PaxosMsg):
+    def on_recv(self, sender: NodeID, message: PaxosMsg) -> None:
         """Perform an action on receiving a message."""

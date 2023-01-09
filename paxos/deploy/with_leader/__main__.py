@@ -1,22 +1,24 @@
 import argparse
 import logging
-from ..sockets import *
-from typing import List
-import scipy.stats
-from ..killer import Killer
-from ..worker import PaxosWorker
-import tempfile
-from pathlib import Path
-import jinja2
-import subprocess
-from subprocess import DEVNULL
 import os
 import signal
+import subprocess
+import sys
+import tempfile
+import threading
+from multiprocessing import Process
+from pathlib import Path
+from subprocess import DEVNULL
+from typing import List
+
+import jinja2
+import scipy.stats
 from flask import Flask, request
 from marshmallow import Schema, fields
-import threading
-import sys
-from multiprocessing import Process
+
+from paxos.deploy.killer import Killer
+from paxos.deploy.sockets import SocketSet
+from paxos.deploy.worker import PaxosWorker
 
 
 class WithLeader:

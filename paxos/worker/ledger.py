@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 from dataclasses import asdict, dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Dict, Union
-from paxos.utils.atomic import AtomicMixin, atomic, atomic_save
+
 from dacite.config import Config
 from dacite.core import from_dict
 from ruamel.yaml import YAML
+
+from paxos.utils.atomic import AtomicMixin, atomic, atomic_save
 
 
 class LedgerError(Exception):

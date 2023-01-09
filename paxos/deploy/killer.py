@@ -1,10 +1,11 @@
+import logging
 import threading
-from scipy.stats import rv_continuous
-from typing import List, Optional
-import numpy as np
 import time
 from abc import ABC, abstractmethod
-import logging
+from typing import List, Optional
+
+import numpy as np
+from scipy.stats import rv_continuous
 
 
 class AbstractWorker(ABC):

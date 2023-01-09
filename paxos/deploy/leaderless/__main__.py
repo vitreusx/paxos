@@ -1,18 +1,20 @@
 import argparse
 import logging
+import os
 import signal
 import subprocess
 import tempfile
 import threading
 from pathlib import Path
 from subprocess import DEVNULL
-import os
 from typing import List
+
 import jinja2
-from ..killer import Killer
-from ..worker import PaxosWorker
-from ..sockets import *
 import scipy
+
+from paxos.deploy.killer import Killer
+from paxos.deploy.sockets import SocketSet
+from paxos.deploy.worker import PaxosWorker
 
 
 class Leaderless:
