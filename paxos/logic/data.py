@@ -12,7 +12,7 @@ class Prepare:
     id: int
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class Accepted:
     id: int
     value: Any

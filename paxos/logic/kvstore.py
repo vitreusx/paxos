@@ -10,6 +10,7 @@ from typing import Any, Iterable
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
 from paxos.logic.server import PaxosServer
 from paxos.utils.atomic import atomic_save
+from paxos.logic.data import Accepted
 
 
 @dataclass
@@ -46,7 +47,6 @@ class KeyValueStore:
     def __init__(self, net: Network, save_path=None, log=None):
         self.net = net
         self.instances: dict[Any, PaxosServer] = {}
-        self.value_set_events: dict[Any, Event] = {}
         self.log = log
 
         self.save_path = Path(save_path) if save_path is not None else None
@@ -86,10 +86,6 @@ class KeyValueStore:
 
                 kv_store.commit()
 
-                if payload.key in kv_store.value_set_events:
-                    event = kv_store.value_set_events[payload.key]
-                    event.set()
-
         host, port = self.net.me.addr.split(":")
         port = int(port)
         return socketserver.UDPServer((host, port), Handler)
@@ -102,8 +98,8 @@ class KeyValueStore:
         timeout = 1.0
         while True:
             paxos_inst = self._lookup(key)
-            self.value_set_events[key] = Event()
-            event = self.value_set_events[key]
+            event = paxos_inst.proposer.value_set_ev
+            event.clear()
 
             paxos_inst.proposer.request(value)
             loop = asyncio.get_running_loop()
@@ -114,6 +110,7 @@ class KeyValueStore:
             except asyncio.exceptions.TimeoutError:
                 timeout *= 2.0
 
-    async def __getitem__(self, key: Any) -> Any:
+    async def __getitem__(self, key: Any):
         await self.set(key, None)
-        return self._lookup(key).learner.value
+        paxos_inst = self._lookup(key)
+        return paxos_inst.proposer.value

@@ -109,7 +109,11 @@ class Worker:
 
         @app.get("/admin/paxos/<key>")
         async def get_paxos(key):
-            return await self.kv_store[key]
+            value = await self.kv_store[key]
+            if value is None:
+                return {}
+            else:
+                return {"value": value}
 
         @app.post("/admin/elect_leader")
         async def elect_leader():
