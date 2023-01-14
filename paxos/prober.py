@@ -16,7 +16,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--probe-period", type=float, required=True)
     p.add_argument("--port", type=int, required=True)
-    p.add_argument("--leader-url")
+    p.add_argument("--leader-update-cb")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--workers", type=str, nargs="*")
     g.add_argument("--worker-ports", type=int, nargs="*")
@@ -52,10 +52,9 @@ def main():
                     with mtx:
                         nonlocal leader
                         leader = data["leader"]
-                        logging.info(f"Elected leader {leader}")
-                        if args.leader_url is not None:
+                        if args.leader_update_cb is not None:
                             requests.put(
-                                args.leader_url,
+                                args.leader_update_cb,
                                 json={"leader": leader},
                             )
                     return
@@ -64,7 +63,7 @@ def main():
 
             time.sleep(1.0)
 
-    if args.leader_url is not None:
+    if args.leader_update_cb is not None:
         elect_leader()
 
     def probe_thread_fn():
@@ -79,9 +78,7 @@ def main():
                 resp = requests.get(req_url)
                 resp.raise_for_status()
             except:
-                logging.info(f"Node {cur_addr} died [Leader is {leader}]")
                 if cur_addr == leader:
-                    logging.info(f"Leader died")
                     elect_leader()
 
             time.sleep(args.probe_period)
