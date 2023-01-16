@@ -70,12 +70,13 @@ class Leaderless:
         self.paxos_dir = tempfile.TemporaryDirectory()
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
             worker = PaxosWorker(
-                flask_p,
-                comm_p,
-                self.args.ledger_file,
-                comm_net,
-                self.args.verbose,
-                self.paxos_dir.name,
+                mode="leaderless",
+                flask_port=flask_p,
+                comm_port=comm_p,
+                ledger_file=self.args.ledger_file,
+                comm_net=comm_net,
+                verbose=self.args.verbose,
+                paxos_dir=self.paxos_dir.name,
             )
             self.workers.append(worker)
             worker.respawn()

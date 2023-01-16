@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 from subprocess import DEVNULL
-from typing import List, Union
+from typing import List, Union, Literal
 
 from paxos.deploy.killer import AbstractWorker
 
@@ -9,6 +9,7 @@ from paxos.deploy.killer import AbstractWorker
 class PaxosWorker(AbstractWorker):
     def __init__(
         self,
+        mode: Literal["leaderless", "with_leader"],
         flask_port: int,
         comm_port: int,
         ledger_file: Union[str, Path],
@@ -17,6 +18,7 @@ class PaxosWorker(AbstractWorker):
         paxos_dir: Union[str, Path],
     ):
         super().__init__()
+        self.mode = mode
         self.flask_port = flask_port
         self.comm_port = comm_port
         self.ledger_file = Path(ledger_file).absolute()
@@ -33,7 +35,7 @@ class PaxosWorker(AbstractWorker):
 
     def respawn(self):
         if not self.is_alive():
-            args = ["python3", "-m", "paxos.worker"]
+            args = ["python3", "-m", f"paxos.worker.{self.mode}"]
             args.extend(["--flask-port", str(self.flask_port)])
             args.extend(["--comm-port", str(self.comm_port)])
             args.extend(["--ledger-file", str(self.ledger_file)])

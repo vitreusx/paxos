@@ -5,18 +5,21 @@ from copy import deepcopy
 from functools import wraps
 from pathlib import Path
 from typing import Union
+from abc import ABC, abstractmethod
 
 
-class AtomicMixin:
+class AtomicMixin(ABC):
     def __init__(self):
         self.in_tx = False
         self.prev_state = None
 
+    @abstractmethod
     def commit(self):
-        pass
+        ...
 
+    @abstractmethod
     def restore(self):
-        pass
+        ...
 
 
 def atomic(method):
