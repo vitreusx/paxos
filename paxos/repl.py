@@ -8,6 +8,10 @@ import requests
 from prompt_toolkit.completion import WordCompleter
 
 
+class UserExit(Exception):
+    pass
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("-u", "--url")
@@ -49,6 +53,8 @@ def main():
     transfer_p.add_argument("to", type=int)
     transfer_p.add_argument("amount", type=str)
 
+    quit_p = opt_sp.add_parser("quit")
+
     def on_prompt(text):
         try:
             args = opt_p.parse_args(shlex.split(text))
@@ -64,6 +70,7 @@ def main():
                         "withdraw": withdraw_p,
                         "deposit": deposit_p,
                         "transfer": transfer_p,
+                        "quit": quit_p,
                     }[args.command]
                     p.print_help()
                 else:
@@ -102,6 +109,8 @@ def main():
                 }
                 resp = requests.post(req_url, json=payload)
                 resp.raise_for_status()
+            elif args.endpoint == "quit":
+                raise UserExit
         except requests.HTTPError as e:
             if e.errno == http.HTTPStatus.BAD_REQUEST.value:
                 error_data = resp.json()
@@ -119,8 +128,8 @@ def main():
             try:
                 text = sess.prompt()
                 on_prompt(text)
-            except KeyboardInterrupt:
-                continue
+            except (KeyboardInterrupt, UserExit):
+                break
             except EOFError:
                 break
 
