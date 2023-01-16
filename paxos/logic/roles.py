@@ -1,15 +1,26 @@
 from dataclasses import dataclass, field
-from .communication import *
-from .data import *
 from threading import Event
+from typing import Any
+
+from paxos.logic.communication import Communicator, NodeID, PaxosMsg, Role, RoleBehavior
+from paxos.logic.data import (
+    Accept,
+    Accepted,
+    Nack,
+    Prepare,
+    Promise,
+    Query,
+    QueryResponse,
+    Request,
+)
 
 
 @dataclass
 class Proposal:
     id: int
     value: Any
-    acceptor_ids: set[int] = field(default_factory=lambda: set())
-    prev_accepted: list[Accepted] = field(default_factory=lambda: [])
+    acceptor_ids: set[int] = field(default_factory=set)
+    prev_accepted: list[Accepted] = field(default_factory=list)
 
 
 class Proposer(RoleBehavior):
@@ -90,7 +101,7 @@ class Questioner(RoleBehavior):
         self.comm = comm
         self.quorum_size = quorum_size
         self.acceptor_ids: set[NodeID] = set()
-        self.prev_accepted: List[Accepted] = []
+        self.prev_accepted: list[Accepted] = []
         self.value = None
         self.value_set_ev = Event()
         self._active = False

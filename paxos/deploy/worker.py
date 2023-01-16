@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 from subprocess import DEVNULL
-from typing import List, Union, Literal
+from typing import List, Literal, Union
 
 from paxos.deploy.killer import AbstractWorker
 

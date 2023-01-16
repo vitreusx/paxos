@@ -1,15 +1,14 @@
-from .communication import *
-from . import roles
-from .data import *
+import logging
 import pickle
 import socket
 import socketserver
-import asyncio
-from pathlib import Path
-from typing import Union, Optional
-import threading
-import logging
 import uuid
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterable, Union
+
+from paxos.logic import roles
+from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
 
 
 @dataclass

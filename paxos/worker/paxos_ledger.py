@@ -1,9 +1,9 @@
-from .ledger import Ledger, Decimal, Account
-from paxos.logic.types import MultiPaxos, StateMachine
-from dataclasses import dataclass
-from typing import Union, Any
-from pathlib import Path
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
+
+from paxos.logic.types import MultiPaxos, StateMachine
+from paxos.worker.ledger import Account, Decimal, Ledger
 
 
 class LedgerCmd(ABC):

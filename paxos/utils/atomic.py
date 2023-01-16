@@ -1,11 +1,11 @@
 import os
 import shutil
 import tempfile
+from abc import ABC, abstractmethod
 from copy import deepcopy
 from functools import wraps
 from pathlib import Path
 from typing import Union
-from abc import ABC, abstractmethod
 
 
 class AtomicMixin(ABC):

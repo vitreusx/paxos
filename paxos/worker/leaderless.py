@@ -1,18 +1,18 @@
 import argparse
-import asyncio
 import http
 import logging
 import signal
 import threading
 from pathlib import Path
 from threading import Thread
+
 from flask import Flask, jsonify, request
 from marshmallow import Schema, ValidationError, fields
+
 from paxos.logic.communication import Network
 from paxos.logic.multi import MultiPaxos
-from paxos.logic.types import PaxosVar
-from .paxos_ledger import PaxosLedger
-from .ledger import LedgerError
+from paxos.worker.ledger import LedgerError
+from paxos.worker.paxos_ledger import PaxosLedger
 
 
 class Worker:
