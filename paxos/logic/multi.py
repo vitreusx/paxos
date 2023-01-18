@@ -3,30 +3,25 @@ import pickle
 import socket
 import socketserver
 import uuid
-from dataclasses import dataclass
+from logging import Logger
 from pathlib import Path
 from typing import Any, Iterable, Union
 
 from paxos.logic import roles
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
+from paxos.logic.data import Payload
+from paxos.logic.dictionary import WriteOnceDict
 from paxos.logic.generator import TimeAwareIDGenerator
-
-
-@dataclass
-class Payload:
-    """Multi-Paxos payload."""
-
-    sender: NodeID
-    key: Any
-    message: PaxosMsg
+from paxos.utils.logging import format_payload
 
 
 class UDP_Comm(Communicator):
     """Paxos communicator for Multi-Paxos."""
 
-    def __init__(self, net: Network, key: Any):
+    def __init__(self, net: Network, key: Any, logger: Logger):
         self.net = net
         self.key = key
+        self.log = logger.info
 
     def send(self, message: PaxosMsg, to: Iterable[NodeID]):
         payload = Payload(self.net.me.id, self.key, message)
@@ -34,6 +29,7 @@ class UDP_Comm(Communicator):
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             for recv_id in to:
+                self.log(format_payload(payload, recv_id))
                 host, port = self.net[recv_id].addr.split(":")
                 port = int(port)
                 sock.sendto(data, (host, port))
@@ -42,13 +38,13 @@ class UDP_Comm(Communicator):
         return [node.id for node in self.net.all_of(role)]
 
 
-class MultiPaxos:
+class MultiPaxos(WriteOnceDict):
     """A Multi-Paxos setup, i.e. a dictionary of sorts, with each key being assigned a writeable-once value agreed on by consensus through Paxos."""
 
     def __init__(self, net: Network, save_path: Union[str, Path]):
         self.net = net
         self.instances: dict[Any, roles.Server] = {}
-        self.log = logging.getLogger(f"paxos[{self.net.me.id}]").info
+        self.logger = logging.getLogger(f"node[{self.net.me.id}]")
         self.save_path = Path(save_path)
 
         if self.save_path.exists():
@@ -62,7 +58,7 @@ class MultiPaxos:
     @state.setter
     def state(self, value: dict):
         for key, inst_state in value.items():
-            comm = UDP_Comm(self.net, key)
+            comm = UDP_Comm(self.net, key, self.logger)
             self.instances[key] = self._create_server(comm)
             self.instances[key].state = inst_state
 
@@ -74,7 +70,7 @@ class MultiPaxos:
 
     def _lookup(self, key: Any) -> roles.Server:
         if key not in self.instances:
-            comm = UDP_Comm(self.net, key)
+            comm = UDP_Comm(self.net, key, self.logger)
             server_inst = self._create_server(comm)
             self.instances[key] = server_inst
         return self.instances[key]
@@ -89,7 +85,7 @@ class MultiPaxos:
         class Handler(socketserver.DatagramRequestHandler):
             def handle(self):
                 payload: Payload = pickle.load(self.rfile)
-                paxos.log(payload)
+                # paxos.log(payload)
 
                 paxos_inst = paxos._lookup(payload.key)
                 paxos_inst.on_recv(payload.sender, payload.message)

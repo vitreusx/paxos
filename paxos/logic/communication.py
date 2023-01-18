@@ -5,10 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, List
 
-from paxos.logic.data import PaxosMsg
-
-NodeID = int
-Address = str
+from paxos.logic.data import Address, NodeID, PaxosMsg
 
 
 class Role(Enum):

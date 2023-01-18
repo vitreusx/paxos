@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from paxos.logic.multi import MultiPaxos
+from paxos.logic.dictionary import WriteOnceDict
 
 
 class StateMachine(ABC):
     """A distributed state machine."""
 
-    def __init__(self, paxos: MultiPaxos, prefix: str, init_state):
+    def __init__(self, paxos: WriteOnceDict, prefix: str, init_state):
         self.paxos = paxos
         self.prefix = prefix
         self.watermark = 0
@@ -46,7 +46,7 @@ class PaxosVar(StateMachine):
     class SetValue:
         new_value: Any
 
-    def __init__(self, paxos: MultiPaxos, prefix: str, init_value: Any):
+    def __init__(self, paxos: WriteOnceDict, prefix: str, init_value: Any):
         super().__init__(paxos, prefix, init_value)
 
     async def apply(self, command):
