@@ -76,7 +76,7 @@ class MultiPaxos:
         with open(self.save_path, mode="wb") as save_f:
             pickle.dump(self.state, save_f)
 
-    def UDP_Server(self):
+    def UDP_Server(self) -> socketserver.UDPServer:
         paxos = self
 
         class Handler(socketserver.DatagramRequestHandler):
@@ -93,7 +93,7 @@ class MultiPaxos:
         port = int(port)
         return socketserver.UDPServer((host, port), Handler)
 
-    async def set(self, key: Any, value: Any) -> Any:
+    async def set(self, key: Any, value: Any) -> tuple[bool, Any]:
         """Propose a value to be associated with a given key. Returns the final value reached by consensus (which may or may not be the proposed value)."""
 
         paxos_inst = self._lookup(key)
@@ -114,7 +114,7 @@ class MultiPaxos:
 
             timeout *= 2.0
 
-    async def __getitem__(self, key: Any):
+    async def __getitem__(self, key: Any) -> Any:
         """Get the value associated with a given key. If consensus has not yet been reached on what should be the value, None is returned."""
 
         paxos_inst = self._lookup(key)
