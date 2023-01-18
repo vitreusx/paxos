@@ -88,12 +88,12 @@ class Proposer(RoleBehavior):
             self.recv_nack(message)
 
     @property
-    def state(self):
-        return self.value
+    def state(self) -> tuple[Any, Any]:
+        return self.value, self.id_generator.state
 
     @state.setter
-    def state(self, value):
-        self.value = value
+    def state(self, value: tuple[Any, Any]):
+        self.value, self.id_generator.state = value
 
 
 class Questioner(RoleBehavior):

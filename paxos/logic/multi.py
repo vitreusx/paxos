@@ -11,7 +11,7 @@ from paxos.logic import roles
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
 from paxos.logic.data import Payload
 from paxos.logic.dictionary import WriteOnceDict
-from paxos.logic.generator import TimeAwareIDGenerator
+from paxos.logic.generator import IncrementalIDGenerator
 from paxos.utils.logging import format_payload
 
 
@@ -65,7 +65,7 @@ class MultiPaxos(WriteOnceDict):
     def _create_server(self, comm: Communicator) -> roles.Server:
         uid = self.net.me.id
         max_uid = max(self.net.nodes.keys()) + 1
-        id_generator = TimeAwareIDGenerator(uid, max_uid)
+        id_generator = IncrementalIDGenerator(uid, max_uid)
         return roles.Server(comm, id_generator)
 
     def _lookup(self, key: Any) -> roles.Server:
