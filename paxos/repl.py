@@ -111,7 +111,7 @@ def main():
                 resp.raise_for_status()
             elif args.endpoint == "quit":
                 raise UserExit
-        except requests.HTTPError as e:
+        except (requests.HTTPError, requests.ConnectionError) as e:
             if e.errno == http.HTTPStatus.BAD_REQUEST.value:
                 error_data = resp.json()
                 print(f"[{error_data['error']}] {error_data['details']}")
@@ -128,9 +128,7 @@ def main():
             try:
                 text = sess.prompt()
                 on_prompt(text)
-            except (KeyboardInterrupt, UserExit):
-                break
-            except EOFError:
+            except (KeyboardInterrupt, EOFError, UserExit):
                 break
 
 
