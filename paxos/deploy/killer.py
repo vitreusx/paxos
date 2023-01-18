@@ -1,25 +1,12 @@
 import logging
 import threading
 import time
-from abc import ABC, abstractmethod
 from typing import List, Optional
 
 import numpy as np
 from scipy.stats import rv_continuous
 
-
-class AbstractWorker(ABC):
-    @abstractmethod
-    def kill(self):
-        ...
-
-    @abstractmethod
-    def respawn(self):
-        ...
-
-    @abstractmethod
-    def is_alive(self) -> bool:
-        ...
+from paxos.deploy.worker import AbstractWorker
 
 
 class Killer(threading.Thread):
@@ -36,7 +23,7 @@ class Killer(threading.Thread):
         self.restart_after = restart_after
         self.finishing = finishing
         self.gen = np.random.default_rng()
-        self.log = logging.getLogger("killer").debug
+        self.log = logging.getLogger("killer").info
 
     def run(self):
         timers_mtx = threading.Lock()

@@ -1,9 +1,22 @@
 import subprocess
+from abc import ABC, abstractmethod
 from pathlib import Path
 from subprocess import DEVNULL
 from typing import List, Literal, Union
 
-from paxos.deploy.killer import AbstractWorker
+
+class AbstractWorker(ABC):
+    @abstractmethod
+    def kill(self):
+        ...
+
+    @abstractmethod
+    def respawn(self):
+        ...
+
+    @abstractmethod
+    def is_alive(self) -> bool:
+        ...
 
 
 class PaxosWorker(AbstractWorker):
