@@ -9,6 +9,7 @@ from typing import Any, Iterable, Union
 
 from paxos.logic import roles
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
+from paxos.logic.generator import IncrementalIDGenerator
 
 
 @dataclass
@@ -62,14 +63,20 @@ class MultiPaxos:
     def state(self, value: dict):
         for key, inst_state in value.items():
             comm = UDP_Comm(self.net, key)
-            self.instances[key] = roles.Server(comm)
+            self.instances[key] = self._create_server(comm)
             self.instances[key].state = inst_state
+
+    def _create_server(self, comm: Communicator) -> roles.Server:
+        uid = self.net.me.id
+        max_uid = max(self.net.nodes.keys()) + 1
+        id_generator = IncrementalIDGenerator(uid, max_uid)
+        return roles.Server(comm, id_generator)
 
     def _lookup(self, key: Any) -> roles.Server:
         if key not in self.instances:
             comm = UDP_Comm(self.net, key)
-            paxos_inst = roles.Server(comm)
-            self.instances[key] = paxos_inst
+            server_inst = self._create_server(comm)
+            self.instances[key] = server_inst
         return self.instances[key]
 
     def _commit(self):

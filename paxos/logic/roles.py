@@ -13,6 +13,7 @@ from paxos.logic.data import (
     QueryResponse,
     Request,
 )
+from paxos.logic.generator import IDGenerator
 
 
 @dataclass
@@ -24,10 +25,10 @@ class Proposal:
 
 
 class Proposer(RoleBehavior):
-    def __init__(self, comm: Communicator, quorum_size: int):
+    def __init__(self, comm: Communicator, id_generator: IDGenerator, quorum_size: int):
         self.comm = comm
         self.quorum_size = quorum_size
-        self._next_id = 0
+        self.id_generator = id_generator
         self.proposal: Proposal | None = None
         self.value = None
         self.value_set_ev = Event()
@@ -35,9 +36,8 @@ class Proposer(RoleBehavior):
     def request(self, value: Any):
         assert value is not None
         req = Request(value)
-        id = self._next_id
+        id = self.id_generator.next_id()
         self.proposal = Proposal(id, req.value)
-        self._next_id += 1
         self.value_set_ev.clear()
         self.comm.send(Prepare(id), self.comm.acceptors)
 
@@ -217,11 +217,11 @@ class Learner(RoleBehavior):
 class Server(RoleBehavior):
     """A "Paxos server", i.e. a node with all the behaviors."""
 
-    def __init__(self, comm: Communicator):
+    def __init__(self, comm: Communicator, id_generator: IDGenerator):
         self.comm = comm
         self.acceptor = Acceptor(self.comm)
         quorum_size = len(self.comm.all_of(Role.ACCEPTOR)) // 2 + 1
-        self.proposer = Proposer(self.comm, quorum_size)
+        self.proposer = Proposer(self.comm, id_generator, quorum_size)
         self.questioner = Questioner(self.comm, quorum_size)
         self.learner = Learner(self.comm)
 
