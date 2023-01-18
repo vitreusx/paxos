@@ -89,11 +89,11 @@ class Proposer(RoleBehavior):
 
     @property
     def state(self):
-        return self._next_id, self.value
+        return self.value
 
     @state.setter
     def state(self, value):
-        self._next_id, self.value = value
+        self.value = value
 
 
 class Questioner(RoleBehavior):

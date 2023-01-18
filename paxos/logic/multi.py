@@ -9,7 +9,7 @@ from typing import Any, Iterable, Union
 
 from paxos.logic import roles
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
-from paxos.logic.generator import IncrementalIDGenerator
+from paxos.logic.generator import TimeAwareIDGenerator
 
 
 @dataclass
@@ -56,7 +56,7 @@ class MultiPaxos:
                 self.state = pickle.load(save_f)
 
     @property
-    def state(self):
+    def state(self) -> dict:
         return {key: inst.state for key, inst in self.instances.items()}
 
     @state.setter
@@ -69,7 +69,7 @@ class MultiPaxos:
     def _create_server(self, comm: Communicator) -> roles.Server:
         uid = self.net.me.id
         max_uid = max(self.net.nodes.keys()) + 1
-        id_generator = IncrementalIDGenerator(uid, max_uid)
+        id_generator = TimeAwareIDGenerator(uid, max_uid)
         return roles.Server(comm, id_generator)
 
     def _lookup(self, key: Any) -> roles.Server:
