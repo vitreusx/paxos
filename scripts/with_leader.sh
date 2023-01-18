@@ -8,4 +8,5 @@ python3 -m paxos.deploy.with_leader \
   --prober-port 8000 \
   --gateway-port 8001 \
   -v \
+  --killer-port 8002 \
   $@ 2>&1 | tee log.txt

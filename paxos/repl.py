@@ -17,6 +17,7 @@ def main():
     p.add_argument("-u", "--url")
     p.add_argument("-p", "--port")
     p.add_argument("-e", "--exec")
+    p.add_argument("--killer-port", type=int)
 
     args = p.parse_args()
     if args.url is not None:
@@ -24,6 +25,8 @@ def main():
     else:
         assert args.port is not None
         url = f"http://localhost:{args.port}"
+
+    killer_url = f"http://localhost:{args.killer_port}"
 
     opt_p = argparse.ArgumentParser()
     opt_sp = opt_p.add_subparsers(dest="endpoint")
@@ -55,6 +58,9 @@ def main():
 
     quit_p = opt_sp.add_parser("quit")
 
+    kill_p = opt_sp.add_parser("kill")
+    kill_p.add_argument("uid", type=int)
+
     def on_prompt(text):
         try:
             args = opt_p.parse_args(shlex.split(text))
@@ -71,6 +77,7 @@ def main():
                         "deposit": deposit_p,
                         "transfer": transfer_p,
                         "quit": quit_p,
+                        "kill": kill_p,
                     }[args.command]
                     p.print_help()
                 else:
@@ -111,6 +118,10 @@ def main():
                 resp.raise_for_status()
             elif args.endpoint == "quit":
                 raise UserExit
+            elif args.endpoint == "kill":
+                req_url = urljoin(killer_url, f"/kill/{args.uid}")
+                resp = requests.post(req_url)
+                resp.raise_for_status()
         except (requests.HTTPError, requests.ConnectionError) as e:
             if e.errno == http.HTTPStatus.BAD_REQUEST.value:
                 error_data = resp.json()

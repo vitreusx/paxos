@@ -16,9 +16,10 @@ import scipy.stats
 from flask import Flask, request
 from marshmallow import Schema, fields
 
-from paxos.deploy.killer import Killer
+from paxos.deploy.interactive_killer import InteractiveKiller
 from paxos.deploy.sockets import SocketSet
 from paxos.deploy.worker import PaxosWorker
+from paxos.logic.communication import Network
 
 
 class WithLeader:
@@ -43,6 +44,7 @@ class WithLeader:
         p.add_argument("--num-workers", type=int)
         p.add_argument("--gateway-port", type=int)
         p.add_argument("-v", "--verbose", action="store_true")
+        p.add_argument("--killer-port", type=int)
 
         return p.parse_args()
 
@@ -68,9 +70,10 @@ class WithLeader:
                 self.comm_ports.append(comm_port)
 
     def create_workers(self):
-        self.workers = []
+        self.workers = {}
         comm_net = [f"localhost:{p}" for p in self.comm_ports]
         self.paxos_dir = tempfile.TemporaryDirectory()
+        uids = Network.get_uids(self.comm_ports)
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
             worker = PaxosWorker(
                 mode="with_leader",
@@ -81,7 +84,8 @@ class WithLeader:
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
             )
-            self.workers.append(worker)
+            uid = uids[comm_p]
+            self.workers[uid] = worker
             worker.respawn()
 
     def create_gateway(self):
@@ -142,14 +146,10 @@ class WithLeader:
         return scipy.stats.uniform(loc=loc, scale=scale)
 
     def create_killer(self):
-        kill_every = self.get_delay_rv(self.args.kill_every)
-        if self.args.restart_after is not None:
-            restart_after = self.get_delay_rv(self.args.restart_after)
-        else:
-            restart_after = None
-
-        self.killer = Killer(self.workers, self.finishing, kill_every, restart_after)
-        self.killer.start()
+        self.interactive_killer = InteractiveKiller(
+            self.workers, self.finishing, self.args.restart_after, self.args.killer_port
+        )
+        self.interactive_killer.start()
 
     def create_prober(self):
         prober_argv = ["python3", "-m", "paxos.prober"]
@@ -183,9 +183,9 @@ class WithLeader:
             self.gateway.wait()
 
         if self.args.kill_every is not None:
-            self.killer.join()
+            self.interactive_killer.join()
 
-        for worker in self.workers:
+        for worker in self.workers.values():
             worker.kill()
 
     def main(self):
