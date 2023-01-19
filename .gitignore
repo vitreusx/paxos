@@ -161,7 +161,6 @@ cython_debug/
 
 /ledger.yml
 /log.txt
-/improvements.txt
 
 # vscode
 .vscode/
