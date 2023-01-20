@@ -6,14 +6,12 @@ import signal
 import threading
 from pathlib import Path
 from threading import Thread
-
 from flask import Flask, jsonify, request
 from marshmallow import Schema, ValidationError, fields
-
 from paxos.logic.communication import Network
-from paxos.logic.kvstore import KeyValueStore
-
-from .ledger import FileLedger, LedgerError
+from paxos.logic.multi import MultiPaxos
+from paxos.logic.types import PaxosVar
+from .file_ledger import FileLedger, LedgerError
 
 
 class Worker:
@@ -37,7 +35,7 @@ class Worker:
         level = logging.INFO if self.args.verbose else logging.WARN
         logging.basicConfig(level=level)
 
-    def make_flask_app(self):
+    def setup_flask(self):
         app = Flask(__name__)
 
         @app.errorhandler(LedgerError)
@@ -101,40 +99,14 @@ class Worker:
         def healthcheck():
             return {}
 
-        @app.put("/admin/paxos")
-        async def set_paxos():
-            for key, value in request.args.items():
-                await self.kv_store.set(key, value)
-            return {}
-
-        @app.get("/admin/paxos/<key>")
-        async def get_paxos(key):
-            return await self.kv_store[key]
-
         @app.post("/admin/elect_leader")
         async def elect_leader():
-            # TODO Implement this part (Basic Paxos)
-            leader = f"http://{request.host}"
-            return {"leader": leader}
+            proposal = f"http://{request.host}"
+            await self.leader.set(proposal)
+            return {"leader": proposal}
 
-        return app
-
-    def make_comm_server(self):
-        addr = f"localhost:{self.args.comm_port}"
-        net = Network.from_addresses(self.args.comm_net, addr)
-        save_path = Path(self.args.paxos_dir) / f"{net.me.id}.pkl"
-        paxos_log = logging.getLogger(f"paxos-{net.me.id}").info
-        self.kv_store = KeyValueStore(net, save_path=save_path, log=paxos_log)
-        return self.kv_store.UDP_KV_Server()
-
-    def main(self):
-        self.args = self.parse_args()
-        self.setup_logging()
-        self.ledger = FileLedger(fpath=Path(self.args.ledger_file))
-
-        flask_app = self.make_flask_app()
-        flask_thr = Thread(
-            target=lambda: flask_app.run(
+        self.flask_thr = Thread(
+            target=lambda: app.run(
                 use_reloader=False,
                 debug=False,
                 port=self.args.flask_port,
@@ -142,24 +114,46 @@ class Worker:
             daemon=True,
         )
 
-        def comm_thr_fn():
-            with self.make_comm_server() as srv:
-                srv.serve_forever()
+        self.flask_thr.start()
 
-        comm_thr = Thread(target=comm_thr_fn, daemon=True)
+    def setup_paxos(self):
+        addr = f"localhost:{self.args.comm_port}"
+        net = Network.from_addresses(self.args.comm_net, addr)
+        save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
+        self.paxos = MultiPaxos(net, save_path)
+        self.leader = PaxosVar(self.paxos, "leader", None)
 
-        flask_thr.start()
-        comm_thr.start()
+        def comm_fn():
+            with self.paxos.UDP_Server() as srv:
+                self.paxos_srv = srv
+                self.paxos_srv.serve_forever()
 
-        finishing = threading.Event()
+        self.comm_thr = Thread(
+            target=comm_fn,
+            daemon=False,
+        )
+
+        self.comm_thr.start()
+
+    def main(self):
+        self.args = self.parse_args()
+        self.setup_logging()
+        self.ledger = FileLedger(fpath=Path(self.args.ledger_file))
+
+        self.finishing = threading.Event()
+        self.setup_paxos()
+        self.setup_flask()
 
         def handler(signo, frame):
-            finishing.set()
+            self.finishing.set()
 
         for sig in (signal.SIGTERM, signal.SIGINT):
             signal.signal(sig, handler)
 
-        finishing.wait()
+        self.finishing.wait()
+
+        self.paxos_srv.shutdown()
+        self.comm_thr.join()
 
 
 if __name__ == "__main__":

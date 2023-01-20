@@ -25,9 +25,26 @@ class Promise:
 
 
 @dataclass
+class Nack:
+    id: int
+
+
+@dataclass
 class Accept:
     id: int
     value: Any
 
 
-PaxosMsg = Request | Prepare | Promise | Accept | Accepted
+@dataclass
+class Query:
+    pass
+
+
+@dataclass
+class QueryResponse:
+    prev: Accepted | None
+
+
+PaxosMsg = (
+    Request | Prepare | Promise | Accept | Accepted | Nack | Query | QueryResponse
+)

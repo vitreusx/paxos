@@ -1,0 +1,71 @@
+import asyncio
+import pickle
+import socket
+import socketserver
+from dataclasses import dataclass
+from pathlib import Path
+from threading import Event
+from typing import Any, Iterable, TypeVar, Generic
+from abc import ABC, abstractmethod
+import uuid
+from .communication import Communicator, Network, NodeID, PaxosMsg, Role
+from .roles import Server
+from .multi import MultiPaxos
+import logging
+
+
+class StateMachine(ABC):
+    """A distributed state machine."""
+
+    def __init__(self, paxos: MultiPaxos, prefix: str, init_state):
+        self.paxos = paxos
+        self.prefix = prefix
+        self.watermark = 0
+        self.state = init_state
+
+    @abstractmethod
+    async def apply(self, command):
+        ...
+
+    async def sync(self):
+        while True:
+            ins_cmd = await self.paxos[self.prefix, self.watermark]
+            if ins_cmd is not None:
+                await self.apply(ins_cmd)
+                self.watermark += 1
+            else:
+                break
+
+    async def execute(self, command):
+        await self.sync()
+
+        while True:
+            key = self.prefix, self.watermark
+            successful, ins_cmd = await self.paxos.set(key, command)
+            ret_val = await self.apply(ins_cmd)
+            self.watermark += 1
+            if successful:
+                return ret_val
+
+
+class PaxosVar(StateMachine):
+    """A Paxos-managed variable - as opposed to the value reached by consensus through ordinary Paxos protocol, it can be changed."""
+
+    @dataclass
+    class SetValue:
+        new_value: Any
+
+    def __init__(self, paxos: MultiPaxos, prefix: str, init_value: Any):
+        super().__init__(paxos, prefix, init_value)
+
+    async def apply(self, command):
+        assert isinstance(command, PaxosVar.SetValue)
+        self.state = command.new_value
+
+    async def set(self, new_value: Any):
+        cmd = PaxosVar.SetValue(new_value)
+        return await self.execute(cmd)
+
+    async def get(self):
+        await self.sync()
+        return self.state
