@@ -1,0 +1,8 @@
+Improvements:
+- Killing the leader - logs, an option to kill leader on demand
+- Choosing IDs in the leaderless variant
+- An exponential backoff during contention
+- When doing the healthcheck, return availability [In the leaderful variant]
+- Improve logging to make it more readable
+
+Plan: when complete, notify & arrange a meeting

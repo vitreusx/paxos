@@ -1,3 +1,4 @@
+import io
 from dataclasses import asdict
 from pathlib import Path
 from typing import Union
@@ -37,4 +38,7 @@ class FileLedger(Ledger):
     def commit(self):
         super().commit()
         data = asdict(self)
-        atomic_save(yaml.dump(data), self.fpath)
+        with io.StringIO() as str_f:
+            yaml.dump(data, str_f)
+            data_txt = str_f.getvalue()
+        atomic_save(data_txt, self.fpath)
