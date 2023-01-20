@@ -1,6 +1,7 @@
 from typing import Any
 from uuid import UUID
 
+from paxos.ledger.base import Deposit, LedgerCmd, OpenAccount, Transfer, Withdraw
 from paxos.logic import data
 from paxos.logic.types import PaxosVar
 
@@ -32,12 +33,22 @@ def format_payload(payload: data.Payload, receiver_id: int) -> str:
 def format_accept_body(msg: data.Accept | data.Accepted | None) -> str:
     if msg is None:
         return str(msg)
-    return f"{msg.id} {format_value(msg.value)}"
+    return f"{msg.id} [{format_value(msg.value)}]"
 
 
 def format_value(value: Any) -> str:
     match value:
-        case uuid, set_value:
-            if isinstance(uuid, UUID) and isinstance(set_value, PaxosVar.SetValue):
-                return str(set_value.new_value)
+        case uuid, val:
+            if not isinstance(uuid, UUID):
+                return str(value)
+            if isinstance(val, PaxosVar.SetValue):
+                return str(val.new_value)
+            elif isinstance(val, OpenAccount):
+                return "OPENACCOUNT"
+            elif isinstance(val, Deposit):
+                return f"DEPOSIT {val.amount}$ to {val.uid}"
+            elif isinstance(val, Withdraw):
+                return f"WITHDRAW {val.amount}$ from {val.uid}"
+            elif isinstance(val, Transfer):
+                return f"TRANSFER {val.amount}$ {val.from_uid} -> {val.to_uid}"
     return str(value)

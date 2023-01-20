@@ -17,6 +17,33 @@ class Account:
 
 
 @dataclass
+class OpenAccount:
+    pass
+
+
+@dataclass
+class Deposit:
+    uid: int
+    amount: Decimal
+
+
+@dataclass
+class Withdraw:
+    uid: int
+    amount: Decimal
+
+
+@dataclass
+class Transfer:
+    from_uid: int
+    to_uid: int
+    amount: Decimal
+
+
+LedgerCmd = OpenAccount | Deposit | Withdraw | Transfer
+
+
+@dataclass
 class Ledger(AtomicMixin):
     accounts: dict[int, Account]
     next_uid: int

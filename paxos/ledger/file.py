@@ -7,8 +7,8 @@ from dacite.config import Config
 from dacite.core import from_dict
 from ruamel.yaml import YAML
 
+from paxos.ledger.base import Decimal, Ledger
 from paxos.utils.atomic import atomic_save
-from paxos.worker.ledger import Decimal, Ledger
 
 
 def Decimal_repr(representer, value: Decimal):
