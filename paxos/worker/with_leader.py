@@ -76,8 +76,8 @@ class Worker:
             uid = fields.Int()
             amount = fields.Decimal()
 
-        @app.post("/withdrawal")
-        def withdrawal():
+        @app.post("/withdraw")
+        def withdraw():
             data = WithdrawalSchema().load(request.json)
             self.ledger.withdraw(data["uid"], data["amount"])
             return {}
