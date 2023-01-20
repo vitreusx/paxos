@@ -34,9 +34,10 @@ class InteractiveKiller(threading.Thread):
 
             self.log(f"killing {worker} of uid {uid}")
             worker.kill()
+            return {}
 
         @app.post("/respawn/<int:uid>")
-        def revive(uid: int):
+        def respawn(uid: int):
             worker = self.workers[uid]
             if worker is None:
                 self.log(f"Uknown worker uid {uid}")

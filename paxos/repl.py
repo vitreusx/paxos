@@ -35,7 +35,15 @@ def main():
     help_p.add_argument(
         "command",
         default=None,
-        choices=["account", "withdraw", "deposit", "transfer"],
+        choices=[
+            "account",
+            "withdraw",
+            "deposit",
+            "transfer",
+            "quit",
+            "kill",
+            "respawn",
+        ],
     )
 
     account_p = opt_sp.add_parser("account")
@@ -61,6 +69,9 @@ def main():
     kill_p = opt_sp.add_parser("kill")
     kill_p.add_argument("uid", type=int)
 
+    respawn_p = opt_sp.add_parser("respawn")
+    respawn_p.add_argument("uid", type=int)
+
     def on_prompt(text):
         try:
             args = opt_p.parse_args(shlex.split(text))
@@ -78,6 +89,7 @@ def main():
                         "transfer": transfer_p,
                         "quit": quit_p,
                         "kill": kill_p,
+                        "respawn": respawn_p,
                     }[args.command]
                     p.print_help()
                 else:
@@ -120,6 +132,10 @@ def main():
                 raise UserExit
             elif args.endpoint == "kill":
                 req_url = urljoin(killer_url, f"/kill/{args.uid}")
+                resp = requests.post(req_url)
+                resp.raise_for_status()
+            elif args.endpoint == "respawn":
+                req_url = urljoin(killer_url, f"/respawn/{args.uid}")
                 resp = requests.post(req_url)
                 resp.raise_for_status()
         except (requests.HTTPError, requests.ConnectionError) as e:

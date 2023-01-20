@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from paxos.logic.types import MultiPaxos, StateMachine
+from paxos.logic.multi import MultiPaxos
+from paxos.logic.types import StateMachine
 from paxos.worker.ledger import Account, Decimal, Ledger
 
 

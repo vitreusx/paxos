@@ -16,7 +16,8 @@ import scipy.stats
 from flask import Flask, request
 from marshmallow import Schema, fields
 
-from paxos.deploy.interactive_killer import InteractiveKiller
+from paxos.deploy.killer.interactive import InteractiveKiller
+from paxos.deploy.killer.random import RandomKiller
 from paxos.deploy.sockets import SocketSet
 from paxos.deploy.worker import PaxosWorker
 from paxos.logic.communication import Network
@@ -45,6 +46,7 @@ class WithLeader:
         p.add_argument("--gateway-port", type=int)
         p.add_argument("-v", "--verbose", action="store_true")
         p.add_argument("--killer-port", type=int)
+        p.add_argument("--killer-type", type=str, choices=["interactive", "random"])
 
         return p.parse_args()
 
@@ -146,10 +148,20 @@ class WithLeader:
         return scipy.stats.uniform(loc=loc, scale=scale)
 
     def create_killer(self):
-        self.interactive_killer = InteractiveKiller(
-            self.workers, self.finishing, self.args.restart_after, self.args.killer_port
-        )
-        self.interactive_killer.start()
+        if self.args.killer_type == "interactive":
+            self.killer = InteractiveKiller(
+                self.workers, self.finishing, self.args.killer_port
+            )
+        else:
+            kill_every = self.get_delay_rv(self.args.kill_every)
+            if self.args.restart_after is not None:
+                restart_after = self.get_delay_rv(self.args.restart_after)
+            else:
+                restart_after = None
+            self.killer = RandomKiller(
+                list(self.workers.values()), self.finishing, kill_every, restart_after
+            )
+        self.killer.start()
 
     def create_prober(self):
         prober_argv = ["python3", "-m", "paxos.prober"]
@@ -182,8 +194,8 @@ class WithLeader:
             self.gateway.terminate()
             self.gateway.wait()
 
-        if self.args.kill_every is not None:
-            self.interactive_killer.join()
+        # if self.args.kill_every is not None:
+        self.killer.join()
 
         for worker in self.workers.values():
             worker.kill()

@@ -9,7 +9,7 @@ from scipy.stats import rv_continuous
 from paxos.deploy.worker import AbstractWorker
 
 
-class Killer(threading.Thread):
+class RandomKiller(threading.Thread):
     def __init__(
         self,
         workers: List[AbstractWorker],
