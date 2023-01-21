@@ -9,5 +9,6 @@ python3 -m paxos.deploy.with_leader \
   --restart-after 1.0 \
   --killer-port 8002 \
   --killer-type interactive \
+  --generator incremental \
   --verbose \
   $@ 2>&1 | tee log.txt

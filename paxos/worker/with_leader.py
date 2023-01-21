@@ -28,6 +28,7 @@ class Worker:
         p.add_argument("--ledger-file", required=True)
         p.add_argument("--comm-net", nargs="*")
         p.add_argument("--paxos-dir", required=True)
+        p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
         p.add_argument("-v", "--verbose", action="store_true")
 
         return p.parse_args()
@@ -120,7 +121,7 @@ class Worker:
         addr = f"localhost:{self.args.comm_port}"
         net = Network.from_addresses(self.args.comm_net, addr)
         save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
-        self.paxos = MultiPaxos(net, save_path)
+        self.paxos = MultiPaxos(net, save_path, self.args.generator)
         self.leader = PaxosVar(self.paxos, "leader", None)
 
         def comm_fn():

@@ -47,6 +47,7 @@ class WithLeader:
         p.add_argument("-v", "--verbose", action="store_true")
         p.add_argument("--killer-port", type=int)
         p.add_argument("--killer-type", type=str, choices=["interactive", "random"])
+        p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
 
         return p.parse_args()
 
@@ -83,6 +84,7 @@ class WithLeader:
                 comm_net=comm_net,
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
+                generator_type=self.args.generator,
             )
             uid = uids[comm_p]
             self.workers[uid] = worker

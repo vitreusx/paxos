@@ -29,6 +29,7 @@ class PaxosWorker(AbstractWorker):
         comm_net: List[str],
         verbose: bool,
         paxos_dir: Union[str, Path],
+        generator_type: Literal["incremental", "time_aware"],
     ):
         super().__init__()
         self.mode = mode
@@ -39,6 +40,7 @@ class PaxosWorker(AbstractWorker):
         self.verbose = verbose
         self.paxos_dir = Path(paxos_dir).absolute()
         self._proc = None
+        self.generator_type = generator_type
 
     def kill(self):
         if self.is_alive() and self._proc is not None:
@@ -54,6 +56,7 @@ class PaxosWorker(AbstractWorker):
             args.extend(["--ledger-file", str(self.ledger_file)])
             args.extend(["--comm-net", *self.comm_net])
             args.extend(["--paxos-dir", str(self.paxos_dir)])
+            args.extend(["--generator", self.generator_type])
             if self.verbose:
                 args.extend(["-v"])
 
