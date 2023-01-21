@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import http
 import logging
 import random
@@ -12,6 +13,17 @@ from flask import Flask, jsonify
 from marshmallow import ValidationError
 
 from paxos.logic.communication import Network
+
+
+def get_election_result(uid: int, addr: str, logger: logging.Logger) -> str | None:
+    try:
+        logger.info(f"asking node[{uid}] ({addr}) to elect the leader")
+        resp = requests.post(f"{addr}/admin/elect_leader")
+        resp.raise_for_status()
+        data = resp.json()
+        return data["leader"]
+    except:
+        return None
 
 
 def main():
@@ -30,41 +42,44 @@ def main():
     logger = logging.getLogger("prober")
 
     if args.workers is not None:
-        workers = args.workers
+        worker_addrs = args.workers
     elif args.worker_ports is not None:
-        addrs_uids = Network.get_uids(
-            f"http://localhost:{port}" for port in args.worker_ports
-        )
-        workers = {uid: addr for addr, uid in addrs_uids.items()}
+        worker_addrs = [f"http://localhost:{port}" for port in args.worker_ports]
     else:
-        workers = {}
+        worker_addrs = []
+
+    addr_to_uid = Network.get_uids(worker_addrs)
+    workers = {uid: addr for addr, uid in addr_to_uid.items()}
 
     mtx = threading.RLock()
     last_probed = None
     leader = None
 
     def elect_leader():
-        while True:
-            for uid, addr in workers.items():
-                try:
-                    logger.info(f"asking node[{uid}] ({addr}) to elect the leader")
-                    resp = requests.post(f"{addr}/admin/elect_leader")
-                    resp.raise_for_status()
+        async def elect_leader_async():
+            leader_responses = await asyncio.gather(
+                *[
+                    asyncio.to_thread(get_election_result, uid, addr, logger)
+                    for uid, addr in workers.items()
+                ]
+            )
+            leaders = set(resp for resp in leader_responses if resp is not None)
+            with mtx:
+                nonlocal leader
+                if len(leaders) != 1:
+                    logger.error(f"failed to elect leaders, got {leaders}")
+                else:
+                    leader = leaders.pop()
+                    logger.info(
+                        f"elected node[{addr_to_uid[leader]}] ({leader}) to be the leader"
+                    )
+                if args.leader_update_cb is not None:
+                    requests.put(
+                        args.leader_update_cb,
+                        json={"leader": leader},
+                    )
 
-                    data = resp.json()
-                    with mtx:
-                        nonlocal leader
-                        leader = data["leader"]
-                        if args.leader_update_cb is not None:
-                            requests.put(
-                                args.leader_update_cb,
-                                json={"leader": leader},
-                            )
-                    return
-                except:
-                    pass
-
-            time.sleep(1.0)
+        asyncio.run(elect_leader_async())
 
     if args.leader_update_cb is not None:
         elect_leader()
