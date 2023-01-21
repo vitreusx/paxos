@@ -16,7 +16,7 @@ class InteractiveKiller(threading.Thread):
         super().__init__()
         self.workers = workers
         self.finishing = finishing
-        self.log = logging.getLogger("interactive-killer").info
+        self.log = logging.getLogger("killer").info
         self.flask_port = flask_port
 
     def setup_flask(self):

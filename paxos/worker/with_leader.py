@@ -34,8 +34,6 @@ class Worker:
 
     def setup_logging(self):
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
 
     def setup_flask(self):
         app = Flask(__name__)

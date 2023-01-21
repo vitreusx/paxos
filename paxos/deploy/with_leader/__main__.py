@@ -53,8 +53,6 @@ class WithLeader:
     def setup_logging(self):
         # Set up the logger - by default INFO-level stuff is suppressed.
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
 
     def reserve_ports(self):
         with SocketSet() as sset:

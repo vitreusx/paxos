@@ -47,8 +47,6 @@ class Leaderless:
 
     def setup_logging(self):
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
 
     def reserve_ports(self):
         with SocketSet() as sset:

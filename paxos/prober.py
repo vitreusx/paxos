@@ -11,6 +11,8 @@ import requests
 from flask import Flask, jsonify
 from marshmallow import ValidationError
 
+from paxos.logic.communication import Network
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -25,14 +27,17 @@ def main():
     args = p.parse_args()
 
     logging.getLogger("werkzeug").setLevel(logging.WARN)
-    logging.basicConfig(level=logging.INFO if args.verbose else logging.WARN)
+    logger = logging.getLogger("prober")
 
     if args.workers is not None:
         workers = args.workers
     elif args.worker_ports is not None:
-        workers = [f"http://localhost:{port}" for port in args.worker_ports]
+        addrs_uids = Network.get_uids(
+            f"http://localhost:{port}" for port in args.worker_ports
+        )
+        workers = {uid: addr for addr, uid in addrs_uids.items()}
     else:
-        workers = []
+        workers = {}
 
     mtx = threading.RLock()
     last_probed = None
@@ -40,11 +45,9 @@ def main():
 
     def elect_leader():
         while True:
-            for addr in workers:
-                other_nodes = list(workers)
-                other_nodes.remove(addr)
-
+            for uid, addr in workers.items():
                 try:
+                    logger.info(f"asking node[{uid}] ({addr}) to elect the leader")
                     resp = requests.post(f"{addr}/admin/elect_leader")
                     resp.raise_for_status()
 
@@ -68,7 +71,7 @@ def main():
 
     def probe_thread_fn():
         while True:
-            cur_addr = random.choice(workers)
+            cur_addr = random.choice(list(workers.values()))
             with mtx:
                 nonlocal last_probed
                 last_probed = cur_addr
