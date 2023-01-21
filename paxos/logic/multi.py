@@ -5,13 +5,13 @@ import socketserver
 import uuid
 from logging import Logger
 from pathlib import Path
-from typing import Any, Iterable, Union
+from typing import Any, Iterable, Literal, Union
 
 from paxos.logic import roles
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
 from paxos.logic.data import Payload
 from paxos.logic.dictionary import WriteOnceDict
-from paxos.logic.generator import IncrementalIDGenerator
+from paxos.logic.generator import IncrementalIDGenerator, TimeAwareIDGenerator
 from paxos.utils.logging import format_payload
 
 
@@ -41,11 +41,17 @@ class UDP_Comm(Communicator):
 class MultiPaxos(WriteOnceDict):
     """A Multi-Paxos setup, i.e. a dictionary of sorts, with each key being assigned a writeable-once value agreed on by consensus through Paxos."""
 
-    def __init__(self, net: Network, save_path: Union[str, Path]):
+    def __init__(
+        self,
+        net: Network,
+        save_path: Union[str, Path],
+        generator_type: Literal["incremental", "time_aware"] = "incremental",
+    ):
         self.net = net
         self.instances: dict[Any, roles.Server] = {}
         self.logger = logging.getLogger(f"node[{self.net.me.id}]")
         self.save_path = Path(save_path)
+        self.generator_type = generator_type
 
         if self.save_path.exists():
             with open(self.save_path, mode="rb") as save_f:
@@ -65,7 +71,10 @@ class MultiPaxos(WriteOnceDict):
     def _create_server(self, comm: Communicator) -> roles.Server:
         uid = self.net.me.id
         max_uid = max(self.net.nodes.keys()) + 1
-        id_generator = IncrementalIDGenerator(uid, max_uid)
+        if self.generator_type == "incremental":
+            id_generator = IncrementalIDGenerator(uid, max_uid)
+        else:
+            id_generator = TimeAwareIDGenerator(uid, max_uid)
         return roles.Server(comm, id_generator)
 
     def _lookup(self, key: Any) -> roles.Server:
