@@ -1,22 +1,34 @@
 from dataclasses import dataclass, field
-from .communication import *
-from .data import *
 from threading import Event
+from typing import Any
+
+from paxos.logic.communication import Communicator, NodeID, PaxosMsg, Role, RoleBehavior
+from paxos.logic.data import (
+    Accept,
+    Accepted,
+    Nack,
+    Prepare,
+    Promise,
+    Query,
+    QueryResponse,
+    Request,
+)
+from paxos.logic.generator import IDGenerator
 
 
 @dataclass
 class Proposal:
     id: int
     value: Any
-    acceptor_ids: set[int] = field(default_factory=lambda: set())
-    prev_accepted: list[Accepted] = field(default_factory=lambda: [])
+    acceptor_ids: set[int] = field(default_factory=set)
+    prev_accepted: list[Accepted] = field(default_factory=list)
 
 
 class Proposer(RoleBehavior):
-    def __init__(self, comm: Communicator, quorum_size: int):
+    def __init__(self, comm: Communicator, id_generator: IDGenerator, quorum_size: int):
         self.comm = comm
         self.quorum_size = quorum_size
-        self._next_id = 0
+        self.id_generator = id_generator
         self.proposal: Proposal | None = None
         self.value = None
         self.value_set_ev = Event()
@@ -24,9 +36,8 @@ class Proposer(RoleBehavior):
     def request(self, value: Any):
         assert value is not None
         req = Request(value)
-        id = self._next_id
+        id = self.id_generator.next_id()
         self.proposal = Proposal(id, req.value)
-        self._next_id += 1
         self.value_set_ev.clear()
         self.comm.send(Prepare(id), self.comm.acceptors)
 
@@ -77,12 +88,12 @@ class Proposer(RoleBehavior):
             self.recv_nack(message)
 
     @property
-    def state(self):
-        return self._next_id, self.value
+    def state(self) -> tuple[Any, Any]:
+        return self.value, self.id_generator.state
 
     @state.setter
-    def state(self, value):
-        self._next_id, self.value = value
+    def state(self, value: tuple[Any, Any]):
+        self.value, self.id_generator.state = value
 
 
 class Questioner(RoleBehavior):
@@ -90,7 +101,7 @@ class Questioner(RoleBehavior):
         self.comm = comm
         self.quorum_size = quorum_size
         self.acceptor_ids: set[NodeID] = set()
-        self.prev_accepted: List[Accepted] = []
+        self.prev_accepted: list[Accepted] = []
         self.value = None
         self.value_set_ev = Event()
         self._active = False
@@ -206,11 +217,11 @@ class Learner(RoleBehavior):
 class Server(RoleBehavior):
     """A "Paxos server", i.e. a node with all the behaviors."""
 
-    def __init__(self, comm: Communicator):
+    def __init__(self, comm: Communicator, id_generator: IDGenerator):
         self.comm = comm
         self.acceptor = Acceptor(self.comm)
         quorum_size = len(self.comm.all_of(Role.ACCEPTOR)) // 2 + 1
-        self.proposer = Proposer(self.comm, quorum_size)
+        self.proposer = Proposer(self.comm, id_generator, quorum_size)
         self.questioner = Questioner(self.comm, quorum_size)
         self.learner = Learner(self.comm)
 

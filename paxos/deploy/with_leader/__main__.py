@@ -16,9 +16,11 @@ import scipy.stats
 from flask import Flask, request
 from marshmallow import Schema, fields
 
-from paxos.deploy.killer import Killer
+from paxos.deploy.killer.interactive import InteractiveKiller
+from paxos.deploy.killer.random import RandomKiller
 from paxos.deploy.sockets import SocketSet
 from paxos.deploy.worker import PaxosWorker
+from paxos.logic.communication import Network
 
 
 class WithLeader:
@@ -43,14 +45,15 @@ class WithLeader:
         p.add_argument("--num-workers", type=int)
         p.add_argument("--gateway-port", type=int)
         p.add_argument("-v", "--verbose", action="store_true")
+        p.add_argument("--killer-port", type=int)
+        p.add_argument("--killer-type", type=str, choices=["interactive", "random"])
+        p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
 
         return p.parse_args()
 
     def setup_logging(self):
         # Set up the logger - by default INFO-level stuff is suppressed.
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
 
     def reserve_ports(self):
         with SocketSet() as sset:
@@ -68,9 +71,10 @@ class WithLeader:
                 self.comm_ports.append(comm_port)
 
     def create_workers(self):
-        self.workers = []
+        self.workers = {}
         comm_net = [f"localhost:{p}" for p in self.comm_ports]
         self.paxos_dir = tempfile.TemporaryDirectory()
+        uids = Network.get_uids(self.comm_ports)
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
             worker = PaxosWorker(
                 mode="with_leader",
@@ -80,8 +84,10 @@ class WithLeader:
                 comm_net=comm_net,
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
+                generator_type=self.args.generator,
             )
-            self.workers.append(worker)
+            uid = uids[comm_p]
+            self.workers[uid] = worker
             worker.respawn()
 
     def create_gateway(self):
@@ -142,13 +148,19 @@ class WithLeader:
         return scipy.stats.uniform(loc=loc, scale=scale)
 
     def create_killer(self):
-        kill_every = self.get_delay_rv(self.args.kill_every)
-        if self.args.restart_after is not None:
-            restart_after = self.get_delay_rv(self.args.restart_after)
+        if self.args.killer_type == "interactive":
+            self.killer = InteractiveKiller(
+                self.workers, self.finishing, self.args.killer_port
+            )
         else:
-            restart_after = None
-
-        self.killer = Killer(self.workers, self.finishing, kill_every, restart_after)
+            kill_every = self.get_delay_rv(self.args.kill_every)
+            if self.args.restart_after is not None:
+                restart_after = self.get_delay_rv(self.args.restart_after)
+            else:
+                restart_after = None
+            self.killer = RandomKiller(
+                list(self.workers.values()), self.finishing, kill_every, restart_after
+            )
         self.killer.start()
 
     def create_prober(self):
@@ -182,10 +194,10 @@ class WithLeader:
             self.gateway.terminate()
             self.gateway.wait()
 
-        if self.args.kill_every is not None:
-            self.killer.join()
+        # if self.args.kill_every is not None:
+        self.killer.join()
 
-        for worker in self.workers:
+        for worker in self.workers.values():
             worker.kill()
 
     def main(self):

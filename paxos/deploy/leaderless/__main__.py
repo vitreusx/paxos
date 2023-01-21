@@ -12,7 +12,8 @@ from typing import List
 import jinja2
 import scipy
 
-from paxos.deploy.killer import Killer
+from paxos.deploy.killer.interactive import InteractiveKiller
+from paxos.deploy.killer.random import RandomKiller
 from paxos.deploy.sockets import SocketSet
 from paxos.deploy.worker import PaxosWorker
 
@@ -37,17 +38,16 @@ class Leaderless:
 
         g = p.add_mutually_exclusive_group()
         g.add_argument("--num-workers", type=int)
-
         p.add_argument("--gateway-port", type=int)
-
         p.add_argument("-v", "--verbose", action="store_true")
+        p.add_argument("--killer-port", type=int)
+        p.add_argument("--killer-type", type=str, choices=["interactive", "random"])
+        p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
 
         return p.parse_args()
 
     def setup_logging(self):
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
 
     def reserve_ports(self):
         with SocketSet() as sset:
@@ -77,6 +77,7 @@ class Leaderless:
                 comm_net=comm_net,
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
+                generator_type=self.args.generator,
             )
             self.workers.append(worker)
             worker.respawn()
@@ -121,13 +122,19 @@ class Leaderless:
         return scipy.stats.uniform(loc=loc, scale=scale)
 
     def create_killer(self):
-        kill_every = self.get_delay_rv(self.args.kill_every)
-        if self.args.restart_after is not None:
-            restart_after = self.get_delay_rv(self.args.restart_after)
+        if self.args.killer_type == "interactive":
+            self.killer = InteractiveKiller(
+                self.workers, self.finishing, self.args.killer_port
+            )
         else:
-            restart_after = None
-
-        self.killer = Killer(self.workers, self.finishing, kill_every, restart_after)
+            kill_every = self.get_delay_rv(self.args.kill_every)
+            if self.args.restart_after is not None:
+                restart_after = self.get_delay_rv(self.args.restart_after)
+            else:
+                restart_after = None
+            self.killer = RandomKiller(
+                list(self.workers.values()), self.finishing, kill_every, restart_after
+            )
         self.killer.start()
 
     def setup_signals(self):

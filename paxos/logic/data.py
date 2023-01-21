@@ -48,3 +48,15 @@ class QueryResponse:
 PaxosMsg = (
     Request | Prepare | Promise | Accept | Accepted | Nack | Query | QueryResponse
 )
+
+NodeID = int
+Address = str
+
+
+@dataclass
+class Payload:
+    """Multi-Paxos payload."""
+
+    sender: NodeID
+    key: Any
+    message: PaxosMsg

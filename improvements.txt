@@ -6,3 +6,9 @@ Improvements:
 - Improve logging to make it more readable
 
 Plan: when complete, notify & arrange a meeting
+
+- done via repl.py
+- done via IncrementalIDGenerator
+- todo
+- ???
+- done (logging.py)
