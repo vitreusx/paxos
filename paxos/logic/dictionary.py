@@ -1,18 +1,9 @@
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from typing import Any
 
 
 class WriteOnceDict(ABC):
     """A dictionary of sorts, with each key being assigned a writeable-once value."""
-
-    @abstractproperty
-    def state(self) -> Any:
-        """for serialization"""
-
-    @state.setter
-    @abstractmethod
-    def state(self, value: dict) -> None:
-        """for serialization"""
 
     @abstractmethod
     async def set(self, key: Any, value: Any) -> Any:
