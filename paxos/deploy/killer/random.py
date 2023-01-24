@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 from scipy.stats import rv_continuous
@@ -12,7 +12,7 @@ from paxos.deploy.worker import AbstractWorker
 class RandomKiller(threading.Thread):
     def __init__(
         self,
-        workers: List[AbstractWorker],
+        workers: dict[int, AbstractWorker],
         finishing: threading.Event,
         kill_every: rv_continuous,
         restart_after: Optional[rv_continuous] = None,
@@ -34,7 +34,7 @@ class RandomKiller(threading.Thread):
         while not self.finishing.is_set():
             with self.any_alive_cv:
                 self.any_alive_cv.wait_for(
-                    lambda: any(w.is_alive() for w in self.workers)
+                    lambda: any(w.is_alive() for w in self.workers.values())
                     or self.finishing.is_set()
                 )
 
@@ -42,21 +42,21 @@ class RandomKiller(threading.Thread):
                     break
 
                 alive_idxes = np.array(
-                    [idx for idx, w in enumerate(self.workers) if w.is_alive()]
+                    [uid for uid, w in self.workers.items() if w.is_alive()]
                 )
-                kill_idx = self.gen.choice(alive_idxes)
+                kill_uid = self.gen.choice(alive_idxes)
 
-            worker = self.workers[kill_idx]
-            self.log(f"killing {worker}")
+            worker = self.workers[kill_uid]
+            self.log(f"killing {worker} of uid {kill_uid}")
             worker.kill()
 
             if self.restart_after is not None:
 
-                def restart_fn(kill_idx_, timer_id_):
-                    worker = self.workers[kill_idx_]
+                def restart_fn(kill_uid, timer_id_):
+                    worker = self.workers[kill_uid]
                     with self.any_alive_cv:
                         worker.respawn()
-                        self.log(f"revived {worker}")
+                        self.log(f"revived {worker} of uid {kill_uid}")
                         self.any_alive_cv.notify()
 
                     with timers_mtx:
@@ -69,7 +69,7 @@ class RandomKiller(threading.Thread):
                         delay,
                         restart_fn,
                         (
-                            kill_idx,
+                            kill_uid,
                             timer_id,
                         ),
                     )

@@ -133,7 +133,7 @@ class Leaderless:
             else:
                 restart_after = None
             self.killer = RandomKiller(
-                list(self.workers.values()), self.finishing, kill_every, restart_after
+                self.workers, self.finishing, kill_every, restart_after
             )
         self.killer.start()
 

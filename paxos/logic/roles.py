@@ -178,6 +178,7 @@ class Learner(RoleBehavior):
     def recv_accepted(self, acceptor: NodeID, accepted: Accepted):
         if self.consensus_value is not None:
             return
+
         self.acceptor_to_msg[acceptor] = accepted
         this_id_count = sum(
             msg.id == accepted.id for msg in self.acceptor_to_msg.values()
