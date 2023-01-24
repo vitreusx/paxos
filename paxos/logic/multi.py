@@ -1,8 +1,8 @@
 import logging
 import pickle
+import random
 import socket
 import socketserver
-import uuid
 from logging import Logger
 from pathlib import Path
 from typing import Any, Iterable, Literal, Union
@@ -70,7 +70,7 @@ class MultiPaxos(WriteOnceDict):
 
     def _create_server(self, comm: Communicator) -> roles.Server:
         uid = self.net.me.id
-        max_uid = max(self.net.nodes.keys()) + 1
+        max_uid = max(self.net.nodes.keys())
         if self.generator_type == "incremental":
             id_generator = IncrementalIDGenerator(uid, max_uid)
         else:
@@ -105,45 +105,35 @@ class MultiPaxos(WriteOnceDict):
         port = int(port)
         return socketserver.UDPServer((host, port), Handler)
 
-    async def set(self, key: Any, value: Any) -> tuple[bool, Any]:
+    async def set(self, key: Any, value: Any) -> Any:
         """Propose a value to be associated with a given key. Returns the final value reached by consensus (which may or may not be the proposed value)."""
 
-        paxos_inst = self._lookup(key)
-        if paxos_inst.proposer.value is not None:
-            set_uid, set_value = paxos_inst.proposer.value
-            return False, set_value
+        proposer = self._lookup(key).proposer
+        event = proposer.request_sent_ev
 
-        event = paxos_inst.proposer.value_set_ev
-
-        uid = uuid.uuid4()
         timeout = 1.0
         while True:
-            paxos_inst.proposer.request((uid, value))
+            proposer.request(value)
             if event.wait(timeout):
-                assert paxos_inst.proposer.value
-                set_uid, set_value = paxos_inst.proposer.value
-                return set_uid == uid, set_value
+                if proposer.consensus_reached:
+                    value = await self[key]
+                    return value
 
-            timeout *= 2.0
+            timeout *= random.random() + 1.0
 
-    async def __getitem__(self, key: Any) -> Any:
+    async def __getitem__(self, key: Any) -> Any | None:
         """Get the value associated with a given key. If consensus has not yet been reached on what should be the value, None is returned."""
 
-        paxos_inst = self._lookup(key)
-        if paxos_inst.questioner.value is not None:
-            set_uid, set_value = paxos_inst.questioner.value
-            return set_value
+        questioner = self._lookup(key).questioner
+        if questioner.value is not None:
+            return questioner.value
 
-        event = paxos_inst.questioner.value_set_ev
+        event = questioner.response_await_ev
 
-        timeout = 1.0
+        timeout = 0.1
         while True:
-            paxos_inst.questioner.query()
+            questioner.query()
             if event.wait(timeout):
-                if paxos_inst.questioner.value is not None:
-                    set_uid, set_value = paxos_inst.questioner.value
-                    return set_value
-                else:
-                    return None
+                return questioner.value
             else:
-                timeout *= 2.0
+                timeout *= 1.1

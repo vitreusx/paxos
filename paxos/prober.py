@@ -15,10 +15,12 @@ from marshmallow import ValidationError
 from paxos.logic.communication import Network
 
 
-def get_election_result(uid: int, addr: str, logger: logging.Logger) -> str | None:
+def get_election_result(
+    node_id: int, addr: str, election_id: int, logger: logging.Logger
+) -> str | None:
     try:
-        logger.info(f"asking node[{uid}] ({addr}) to elect the leader")
-        resp = requests.post(f"{addr}/admin/elect_leader")
+        logger.info(f"asking node[{node_id}] ({addr}) to elect the leader")
+        resp = requests.post(f"{addr}/admin/elect_leader/{election_id}")
         resp.raise_for_status()
         data = resp.json()
         return data["leader"]
@@ -54,15 +56,20 @@ def main():
     mtx = threading.RLock()
     last_probed = None
     leader = None
+    election_id = 0
 
     def elect_leader():
-        async def elect_leader_async():
+        async def elect_leader_async():  # NOTE: Kuba please take a look - looks ugly to me
+            nonlocal election_id
             leader_responses = await asyncio.gather(
                 *[
-                    asyncio.to_thread(get_election_result, uid, addr, logger)
+                    asyncio.to_thread(
+                        get_election_result, uid, addr, election_id, logger
+                    )
                     for uid, addr in workers.items()
                 ]
             )
+            election_id += 1
             leaders = set(resp for resp in leader_responses if resp is not None)
             with mtx:
                 nonlocal leader

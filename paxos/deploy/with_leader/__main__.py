@@ -71,10 +71,16 @@ class WithLeader:
                 self.comm_ports.append(comm_port)
 
     def create_workers(self):
+        def port_to_host(port: int) -> str:
+            return f"localhost:{port}"
+
         self.workers = {}
-        comm_net = [f"localhost:{p}" for p in self.comm_ports]
         self.paxos_dir = tempfile.TemporaryDirectory()
-        uids = Network.get_uids(self.comm_ports)
+
+        comm_net = [port_to_host(p) for p in self.comm_ports]
+        flask_host_to_uid = Network.get_uids(
+            [port_to_host(p) for p in self.flask_ports]
+        )
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
             worker = PaxosWorker(
                 mode="with_leader",
@@ -86,7 +92,7 @@ class WithLeader:
                 paxos_dir=self.paxos_dir.name,
                 generator_type=self.args.generator,
             )
-            uid = uids[comm_p]
+            uid = flask_host_to_uid[port_to_host(flask_p)]
             self.workers[uid] = worker
             worker.respawn()
 

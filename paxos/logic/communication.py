@@ -29,6 +29,10 @@ class Communicator(ABC):
         """Get IDs of all nodes in the network with a given role."""
 
     @property
+    def proposers(self):
+        return self.all_of(Role.PROPOSER)
+
+    @property
     def acceptors(self):
         return self.all_of(Role.ACCEPTOR)
 

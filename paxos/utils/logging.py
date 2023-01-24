@@ -23,7 +23,9 @@ def format_payload(payload: data.Payload, receiver_id: int) -> str:
     elif isinstance(paxos_msg, data.Query):
         body = ""
     elif isinstance(paxos_msg, data.QueryResponse):
-        body = f"{format_accept_body(paxos_msg.prev)}"
+        body = f"{format_value(paxos_msg.value)}"
+    elif isinstance(paxos_msg, data.Consensus):
+        body = format_value(paxos_msg.value)
     else:
         body = paxos_msg
 
@@ -33,22 +35,26 @@ def format_payload(payload: data.Payload, receiver_id: int) -> str:
 def format_accept_body(msg: data.Accept | data.Accepted | None) -> str:
     if msg is None:
         return str(msg)
-    return f"{msg.id} [{format_value(msg.value)}]"
+    return f"{msg.id} {format_value(msg.value)}"
 
 
 def format_value(value: Any) -> str:
     match value:
         case uuid, val:
             if not isinstance(uuid, UUID):
-                return str(value)
+                body = str(value)
             if isinstance(val, PaxosVar.SetValue):
-                return str(val.new_value)
+                body = str(val.new_value)
             elif isinstance(val, OpenAccount):
-                return "OPENACCOUNT"
+                body = "OPENACCOUNT"
             elif isinstance(val, Deposit):
-                return f"DEPOSIT {val.amount}$ to {val.uid}"
+                body = f"DEPOSIT {val.amount}$ to {val.uid}"
             elif isinstance(val, Withdraw):
-                return f"WITHDRAW {val.amount}$ from {val.uid}"
+                body = f"WITHDRAW {val.amount}$ from {val.uid}"
             elif isinstance(val, Transfer):
-                return f"TRANSFER {val.amount}$ {val.from_uid} -> {val.to_uid}"
-    return str(value)
+                body = f"TRANSFER {val.amount}$ {val.from_uid} -> {val.to_uid}"
+            else:
+                body = str(value)
+        case _:
+            body = str(value)
+    return f"[{body}]"

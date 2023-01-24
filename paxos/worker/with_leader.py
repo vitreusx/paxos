@@ -13,7 +13,6 @@ from paxos.ledger.base import LedgerError
 from paxos.ledger.file import FileLedger
 from paxos.logic.communication import Network
 from paxos.logic.multi import MultiPaxos
-from paxos.logic.types import PaxosVar
 
 
 class Worker:
@@ -100,11 +99,11 @@ class Worker:
         def healthcheck():
             return {}
 
-        @app.post("/admin/elect_leader")
-        async def elect_leader():
+        @app.post("/admin/elect_leader/<int:election_id>")
+        async def elect_leader(election_id: int):
             proposal = f"http://{request.host}"
-            await self.leader.set(proposal)
-            return {"leader": proposal}
+            leader = await self.paxos.set(f"leader_{election_id}", proposal)
+            return {"leader": leader}
 
         self.flask_thr = Thread(
             target=lambda: app.run(
@@ -122,7 +121,6 @@ class Worker:
         net = Network.from_addresses(self.args.comm_net, addr)
         save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
         self.paxos = MultiPaxos(net, save_path, self.args.generator)
-        self.leader = PaxosVar(self.paxos, "leader", None)
 
         def comm_fn():
             with self.paxos.UDP_Server() as srv:
