@@ -93,19 +93,25 @@ def main():
 
     def probe_thread_fn():
         while True:
-            cur_addr = random.choice(list(workers.values()))
-            with mtx:
-                nonlocal last_probed
-                last_probed = cur_addr
+            alive = []
+            should_elect = False
+            for uid, worker_addr in workers.items():
+                with mtx:
+                    nonlocal last_probed
+                    last_probed = worker_addr
 
-            try:
-                req_url = urljoin(cur_addr, "/admin/healthcheck")
-                resp = requests.get(req_url)
-                resp.raise_for_status()
-            except:
-                if cur_addr == leader:
-                    elect_leader()
-
+                try:
+                    req_url = urljoin(worker_addr, "/admin/healthcheck")
+                    resp = requests.get(req_url)
+                    resp.raise_for_status()
+                    alive.append(uid)
+                except:
+                    if worker_addr == leader:
+                        should_elect = True
+            logger.info(f"currently alive workers: {alive}")
+            if should_elect:
+                logger.info(f"leader is dead, electing new one")
+                elect_leader()
             time.sleep(args.probe_period)
 
     probe_thr = Thread(target=probe_thread_fn)

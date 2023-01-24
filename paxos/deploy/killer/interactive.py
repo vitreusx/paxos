@@ -32,7 +32,7 @@ class InteractiveKiller(threading.Thread):
                 self.log(f"Uknown worker uid {uid}")
                 return
 
-            self.log(f"killing {worker} of uid {uid}")
+            self.log(f"killing node[{uid}] - {worker}")
             worker.kill()
             return {}
 
@@ -43,7 +43,7 @@ class InteractiveKiller(threading.Thread):
                 self.log(f"Uknown worker uid {uid}")
                 return
 
-            self.log(f"respawning {worker} of uid {uid}")
+            self.log(f"respawning node[{uid}] - {worker}")
             worker.respawn()
             return {}
 

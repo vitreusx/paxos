@@ -47,7 +47,7 @@ class RandomKiller(threading.Thread):
                 kill_uid = self.gen.choice(alive_idxes)
 
             worker = self.workers[kill_uid]
-            self.log(f"killing {worker} of uid {kill_uid}")
+            self.log(f"killing node[{kill_uid}] - {worker}")
             worker.kill()
 
             if self.restart_after is not None:
@@ -56,7 +56,7 @@ class RandomKiller(threading.Thread):
                     worker = self.workers[kill_uid]
                     with self.any_alive_cv:
                         worker.respawn()
-                        self.log(f"revived {worker} of uid {kill_uid}")
+                        self.log(f"revived node[{kill_uid}] - {worker}")
                         self.any_alive_cv.notify()
 
                     with timers_mtx:
