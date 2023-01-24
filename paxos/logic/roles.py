@@ -109,7 +109,7 @@ class Questioner(RoleBehavior):
         self._active = True
         self.comm.send(Query(), self.comm.learners)
 
-    def recv_query_resp(self, acceptor: NodeID, query_resp: QueryResponse):
+    def recv_query_resp(self, learner: NodeID, query_resp: QueryResponse):
         if not self._active or query_resp.value is None:
             return
 
