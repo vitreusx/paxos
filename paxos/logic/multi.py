@@ -115,25 +115,21 @@ class MultiPaxos(WriteOnceDict):
         while True:
             proposer.request(value)
             if event.wait(timeout):
-                if proposer.consensus_reached:
-                    value = await self[key]
-                    return value
+                if proposer.value is not None:
+                    return proposer.value
 
             timeout *= random.random() + 1.0
 
     async def __getitem__(self, key: Any) -> Any | None:
         """Get the value associated with a given key. If consensus has not yet been reached on what should be the value, None is returned."""
 
-        questioner = self._lookup(key).questioner
-        if questioner.value is not None:
-            return questioner.value
-
-        event = questioner.response_await_ev
+        learner = self._lookup(key).learner
+        event = learner.value_found_ev
 
         timeout = 0.1
         while True:
-            questioner.query()
+            learner.query()
             if event.wait(timeout):
-                return questioner.value
+                return learner.value
             else:
                 timeout *= 1.1

@@ -54,6 +54,8 @@ class WithLeader:
     def setup_logging(self):
         # Set up the logger - by default INFO-level stuff is suppressed.
         logging.getLogger("werkzeug").setLevel(logging.WARN)
+        self.logger = logging.getLogger("deploy")
+        self.logger.setLevel(logging.INFO if self.args.verbose else logging.WARN)
 
     def reserve_ports(self):
         with SocketSet() as sset:
@@ -167,6 +169,8 @@ class WithLeader:
             self.killer = RandomKiller(
                 list(self.workers.values()), self.finishing, kill_every, restart_after
             )
+
+        self.killer.daemon = True
         self.killer.start()
 
     def create_prober(self):
@@ -201,7 +205,7 @@ class WithLeader:
             self.gateway.wait()
 
         # if self.args.kill_every is not None:
-        self.killer.join()
+        # self.killer.join()
 
         for worker in self.workers.values():
             worker.kill()
