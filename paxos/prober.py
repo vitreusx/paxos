@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import http
 import logging
-import random
 import threading
 import time
 from threading import Thread
@@ -11,8 +10,6 @@ from urllib.parse import urljoin
 import requests
 from flask import Flask, jsonify
 from marshmallow import ValidationError
-
-from paxos.logic.communication import Network
 
 
 def get_election_result(
@@ -33,9 +30,8 @@ def main():
     p.add_argument("--probe-period", type=float, required=True)
     p.add_argument("--port", type=int, required=True)
     p.add_argument("--leader-update-cb")
-    g = p.add_mutually_exclusive_group()
-    g.add_argument("--workers", type=str, nargs="*")
-    g.add_argument("--worker-ports", type=int, nargs="*")
+    p.add_argument("--worker-uids", type=int, nargs="*")
+    p.add_argument("--worker-ports", type=int, nargs="*")
     p.add_argument("-v", "--verbose", action="store_true")
 
     args = p.parse_args()
@@ -43,14 +39,12 @@ def main():
     logging.getLogger("werkzeug").setLevel(logging.WARN)
     logger = logging.getLogger("prober")
 
-    if args.workers is not None:
-        worker_addrs = args.workers
-    elif args.worker_ports is not None:
+    if args.worker_ports is not None:
         worker_addrs = [f"http://localhost:{port}" for port in args.worker_ports]
     else:
         worker_addrs = []
 
-    addr_to_uid = Network.get_uids(worker_addrs)
+    addr_to_uid = {addr: uid for uid, addr in zip(args.worker_uids, worker_addrs)}
     workers = {uid: addr for addr, uid in addr_to_uid.items()}
 
     mtx = threading.RLock()
