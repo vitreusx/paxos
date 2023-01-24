@@ -76,11 +76,10 @@ class WithLeader:
 
         self.workers = {}
         self.paxos_dir = tempfile.TemporaryDirectory()
+        self.worker_uids = []
 
         comm_net = [port_to_host(p) for p in self.comm_ports]
-        flask_host_to_uid = Network.get_uids(
-            [port_to_host(p) for p in self.flask_ports]
-        )
+        comm_host_to_uid = Network.get_uids(comm_net)
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
             worker = PaxosWorker(
                 mode="with_leader",
@@ -92,8 +91,9 @@ class WithLeader:
                 paxos_dir=self.paxos_dir.name,
                 generator_type=self.args.generator,
             )
-            uid = flask_host_to_uid[port_to_host(flask_p)]
+            uid = comm_host_to_uid[port_to_host(comm_p)]
             self.workers[uid] = worker
+            self.worker_uids.append(uid)
             worker.respawn()
 
     def create_gateway(self):
@@ -173,6 +173,7 @@ class WithLeader:
         prober_argv = ["python3", "-m", "paxos.prober"]
         prober_argv.extend(["--probe-period", str(self.args.probe_period)])
         prober_argv.extend(["--port", str(self.prober_port)])
+        prober_argv.extend(["--worker-uids", *(str(uid) for uid in self.worker_uids)])
         prober_argv.extend(["--worker-ports", *(str(p) for p in self.flask_ports)])
         if self.args.gateway_port is not None:
             leader_update_cb = f"http://localhost:{self.flask_port}/leader"

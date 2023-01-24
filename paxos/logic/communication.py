@@ -58,8 +58,8 @@ class Network:
     me: Node
 
     @staticmethod
-    def get_uids(addrs: Iterable[Address]) -> dict[Address, int]:
-        addr_to_id = {addr: idx for idx, addr in enumerate(sorted(addrs))}
+    def get_uids(comm_addrs: Iterable[Address]) -> dict[Address, int]:
+        addr_to_id = {addr: idx for idx, addr in enumerate(sorted(comm_addrs))}
         return addr_to_id
 
     @staticmethod
