@@ -124,11 +124,11 @@ class MultiPaxos(WriteOnceDict):
     async def __getitem__(self, key: Any) -> Any | None:
         """Get the value associated with a given key. If consensus has not yet been reached on what should be the value, None is returned."""
 
-        questioner = self._lookup(key).questioner
-        if questioner.value is not None:
-            return questioner.value
+        learner = self._lookup(key).learner
+        if learner.consensus_value is not None:
+            return learner.consensus_value
 
-        event = questioner.response_await_ev
-        questioner.query()
+        event = learner.response_await_ev
+        learner.query()
         event.wait(1.0)
-        return questioner.value
+        return learner.consensus_value

@@ -14,7 +14,6 @@ class Role(Enum):
     PROPOSER = 0
     ACCEPTOR = 1
     LEARNER = 2
-    QUESTIONER = 3
 
 
 class Communicator(ABC):
