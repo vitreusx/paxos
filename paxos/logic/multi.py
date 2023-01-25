@@ -6,6 +6,7 @@ import socketserver
 from logging import Logger
 from pathlib import Path
 from typing import Any, Iterable, Literal, Union
+import time
 
 from paxos.logic import roles
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
@@ -110,16 +111,16 @@ class MultiPaxos(WriteOnceDict):
         """Propose a value to be associated with a given key. Returns the final value reached by consensus (which may or may not be the proposed value)."""
 
         proposer = self._lookup(key).proposer
-        event = proposer.request_sent_ev
 
         timeout = 1.0
         while True:
             proposer.request(value)
-            if event.wait(timeout):
-                if proposer.value is not None:
-                    return proposer.value
-
-            timeout *= random.random() + 1.0
+            set_value = await self[key]
+            if set_value is not None:
+                return set_value
+            else:
+                time.sleep(timeout)
+                timeout *= random.random() + 1.0
 
     async def __getitem__(self, key: Any) -> Any | None:
         """Get the value associated with a given key. If consensus has not yet been reached on what should be the value, None is returned."""

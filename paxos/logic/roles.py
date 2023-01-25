@@ -59,30 +59,19 @@ class Proposer(RoleBehavior):
         self.id_generator = id_generator
         self.proposal: Proposal | None = None
         self.promises = AcceptorValues(self.quorum_size)
-        self.accepted = AcceptorValues(self.quorum_size)
-        self.request_sent_ev = Event()
-        self.value = None
 
     def request(self, value: Any):
         assert value is not None
-
-        if self.value is not None:
-            self.request_sent_ev.set()
-        else:
-            req = Request(value)
-            id = self.id_generator.next_id()
-            self.proposal = Proposal(id=id, value=req.value)
-            self.promises.reset()
-            self.accepted.reset()
-            self.request_sent_ev.clear()
-            self.comm.send(Prepare(id), self.comm.acceptors)
+        req = Request(value)
+        id = self.id_generator.next_id()
+        self.proposal = Proposal(id=id, value=req.value)
+        self.promises.reset()
+        self.comm.send(Prepare(id), self.comm.acceptors)
 
     def recv_nack(self, nack: Nack):
         if self.proposal is None or nack.id != self.proposal.id:
             return
-
         self.proposal = None
-        self.request_sent_ev.set()
 
     def recv_promise(self, acceptor: NodeID, promise: Promise):
         if self.proposal is None or promise.id != self.proposal.id:
@@ -103,31 +92,19 @@ class Proposer(RoleBehavior):
             msg = Accept(self.proposal.id, accepted_value)
             self.comm.send(msg, self.comm.acceptors)
 
-    def recv_accepted(self, acceptor: NodeID, accepted: Accepted):
-        if self.proposal is None:
-            return
-
-        self.accepted.add(acceptor, accepted.id, accepted.value)
-        if self.accepted.values is not None:
-            self.proposal = None
-            self.value = self.accepted.values[0]
-            self.request_sent_ev.set()
-
     def on_recv(self, sender: NodeID, message: PaxosMsg):
         if isinstance(message, Promise):
             self.recv_promise(sender, message)
         elif isinstance(message, Nack):
             self.recv_nack(message)
-        elif isinstance(message, Accepted):
-            self.recv_accepted(sender, message)
 
     @property
     def state(self):
-        return self.proposal, self.id_generator.state, self.promises, self.accepted
+        return self.proposal, self.id_generator.state, self.promises
 
     @state.setter
     def state(self, value):
-        self.proposal, self.id_generator.state, self.promises, self.accepted = value
+        self.proposal, self.id_generator.state, self.promises = value
 
 
 class Acceptor(RoleBehavior):
@@ -193,8 +170,8 @@ class Learner(RoleBehavior):
         if self.value is not None:
             return
 
-        if resp.accepted is not None:
-            acc = resp.accepted
+        if resp.value is not None:
+            acc = resp.value
             self.accepted.add(acceptor, acc.id, acc.value)
         else:
             self.accepted.add(acceptor, -1, None)
