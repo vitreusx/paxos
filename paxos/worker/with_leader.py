@@ -29,12 +29,13 @@ class Worker:
         p.add_argument("--paxos-dir", required=True)
         p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
         p.add_argument("-v", "--verbose", action="store_true")
+        p.add_argument("--node-id", type=int, required=True)
 
         return p.parse_args()
 
     def setup_logging(self):
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        self.logger = logging.getLogger(f"worker[{self.args.comm_port}]")
+        self.logger = logging.getLogger(f"worker[{self.args.node_id}]")
 
     def setup_flask(self):
         app = Flask(__name__)

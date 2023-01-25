@@ -1,3 +1,5 @@
+from logging import Logger
+
 from paxos.logic.ledger.base import (
     Account,
     Decimal,
@@ -13,24 +15,20 @@ from paxos.logic.types import StateMachine
 
 
 class PaxosLedger(StateMachine):
-    def __init__(
-        self,
-        paxos: MultiPaxos,
-        prefix: str,
-    ):
+    def __init__(self, paxos: MultiPaxos, prefix: str, parent_logger: Logger):
         ledger = Ledger.empty()
-        super().__init__(paxos, prefix, ledger)
+        super().__init__(paxos, prefix, ledger, parent_logger.getChild("ledger"))
 
     async def apply(self, cmd: LedgerCmd):
-        assert isinstance(self.state, Ledger)
+        assert isinstance(self.current_state, Ledger)
         if isinstance(cmd, OpenAccount):
-            return self.state.open_acct()
+            return self.current_state.open_acct()
         elif isinstance(cmd, Deposit):
-            return self.state.deposit(cmd.uid, cmd.amount)
+            return self.current_state.deposit(cmd.uid, cmd.amount)
         elif isinstance(cmd, Withdraw):
-            return self.state.withdraw(cmd.uid, cmd.amount)
+            return self.current_state.withdraw(cmd.uid, cmd.amount)
         elif isinstance(cmd, Transfer):
-            return self.state.transfer(cmd.from_uid, cmd.to_uid, cmd.amount)
+            return self.current_state.transfer(cmd.from_uid, cmd.to_uid, cmd.amount)
         else:
             raise ValueError(f"Unknown command {cmd}")
 
@@ -40,7 +38,7 @@ class PaxosLedger(StateMachine):
 
     async def account(self, id: int) -> Account:
         await self.sync()
-        return self.state.account(id)
+        return self.current_state.account(id)
 
     async def deposit(self, uid: int, amount: Decimal):
         cmd = Deposit(uid, amount)

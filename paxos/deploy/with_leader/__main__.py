@@ -81,6 +81,7 @@ class WithLeader:
         comm_net = [port_to_host(p) for p in self.comm_ports]
         comm_host_to_uid = Network.get_uids(comm_net)
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
+            uid = comm_host_to_uid[port_to_host(comm_p)]
             worker = PaxosWorker(
                 mode="with_leader",
                 flask_port=flask_p,
@@ -90,8 +91,8 @@ class WithLeader:
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
                 generator_type=self.args.generator,
+                node_id=uid,
             )
-            uid = comm_host_to_uid[port_to_host(comm_p)]
             self.workers[uid] = worker
             self.worker_uids.append(uid)
             worker.respawn()

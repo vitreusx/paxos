@@ -30,6 +30,7 @@ class PaxosWorker(AbstractWorker):
         verbose: bool,
         paxos_dir: Union[str, Path],
         generator_type: Literal["incremental", "time_aware"],
+        node_id: int,
     ):
         super().__init__()
         self.mode = mode
@@ -41,6 +42,7 @@ class PaxosWorker(AbstractWorker):
         self.paxos_dir = Path(paxos_dir).absolute()
         self._proc = None
         self.generator_type = generator_type
+        self.node_id = node_id
 
     def kill(self):
         if self.is_alive() and self._proc is not None:
@@ -57,6 +59,7 @@ class PaxosWorker(AbstractWorker):
             args.extend(["--comm-net", *self.comm_net])
             args.extend(["--paxos-dir", str(self.paxos_dir)])
             args.extend(["--generator", self.generator_type])
+            args.extend(["--node-id", str(self.node_id)])
             if self.verbose:
                 args.extend(["-v"])
 
