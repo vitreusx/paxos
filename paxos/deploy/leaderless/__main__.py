@@ -16,6 +16,7 @@ from paxos.deploy.killer.interactive import InteractiveKiller
 from paxos.deploy.killer.random import RandomKiller
 from paxos.deploy.sockets import SocketSet
 from paxos.deploy.worker import PaxosWorker
+from paxos.logic.communication import Network
 
 
 class Leaderless:
@@ -65,9 +66,14 @@ class Leaderless:
                 self.worker_addrs.append(f"localhost:{flask_port}")
 
     def create_workers(self):
-        self.workers = []
-        comm_net = [f"localhost:{p}" for p in self.comm_ports]
+        def port_to_host(port: int) -> str:
+            return f"localhost:{port}"
+
+        self.workers = {}
         self.paxos_dir = tempfile.TemporaryDirectory()
+
+        comm_net = [port_to_host(p) for p in self.comm_ports]
+        comm_host_to_uid = Network.get_uids(comm_net)
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
             worker = PaxosWorker(
                 mode="leaderless",
@@ -79,7 +85,8 @@ class Leaderless:
                 paxos_dir=self.paxos_dir.name,
                 generator_type=self.args.generator,
             )
-            self.workers.append(worker)
+            uid = comm_host_to_uid[port_to_host(comm_p)]
+            self.workers[uid] = worker
             worker.respawn()
 
     def create_gateway(self):

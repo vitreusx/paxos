@@ -32,10 +32,10 @@ class StateMachine(ABC):
 
         while True:
             key = self.prefix, self.watermark
-            successful, ins_cmd = await self.paxos.set(key, command)
-            ret_val = await self.apply(ins_cmd)
+            applied_cmd = await self.paxos.set(key, command)
+            ret_val = await self.apply(applied_cmd)
             self.watermark += 1
-            if successful:
+            if applied_cmd == command:
                 return ret_val
 
 

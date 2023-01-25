@@ -34,9 +34,7 @@ class Worker:
 
     def setup_logging(self):
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        self.logger = logging.getLogger(
-            f"worker[{self.args.flask_port}, {self.args.comm_port}]"
-        )
+        self.logger = logging.getLogger(f"worker[{self.args.comm_port}]")
 
     def setup_flask(self):
         app = Flask(__name__)

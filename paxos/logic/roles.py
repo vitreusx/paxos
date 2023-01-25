@@ -98,19 +98,21 @@ class Proposer(RoleBehavior):
 
 
 class Questioner(RoleBehavior):
-    def __init__(self, comm: Communicator):
+    def __init__(self, comm: Communicator, quorum_size: int):
         self.comm = comm
         self.value = None
         self.response_await_ev = Event()
-        self._active = False
+        self.quorum_size = quorum_size
+        self._responses_recv = 0
 
     def query(self):
         self.response_await_ev.clear()
-        self._active = True
+        self._responses_recv = 0
         self.comm.send(Query(), self.comm.learners)
 
     def recv_query_resp(self, learner: NodeID, query_resp: QueryResponse):
-        if not self._active or query_resp.value is None:
+        self._responses_recv += 1
+        if query_resp.value is None and self._responses_recv < self.quorum_size:
             return
 
         self._active = False
@@ -213,7 +215,7 @@ class Server(RoleBehavior):
         quorum_size = len(self.comm.all_of(Role.ACCEPTOR)) // 2 + 1
         self.acceptor = Acceptor(self.comm)
         self.proposer = Proposer(self.comm, id_generator, quorum_size)
-        self.questioner = Questioner(self.comm)
+        self.questioner = Questioner(self.comm, quorum_size)
         self.learner = Learner(self.comm, quorum_size)
 
     @property

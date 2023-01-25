@@ -129,11 +129,6 @@ class MultiPaxos(WriteOnceDict):
             return questioner.value
 
         event = questioner.response_await_ev
-
-        timeout = 0.1
-        while True:
-            questioner.query()
-            if event.wait(timeout):
-                return questioner.value
-            else:
-                timeout *= 1.1
+        questioner.query()
+        event.wait(1.0)
+        return questioner.value
