@@ -1,8 +1,8 @@
 from typing import Any
 from uuid import UUID
 
-from paxos.ledger.base import Deposit, OpenAccount, Transfer, Withdraw
 from paxos.logic import data
+from paxos.logic.ledger.base import Deposit, OpenAccount, Transfer, Withdraw
 from paxos.logic.types import PaxosVar
 
 

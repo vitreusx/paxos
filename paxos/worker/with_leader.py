@@ -9,9 +9,9 @@ from threading import Thread
 from flask import Flask, jsonify, request
 from marshmallow import Schema, ValidationError, fields
 
-from paxos.ledger.base import LedgerError
-from paxos.ledger.file import FileLedger
 from paxos.logic.communication import Network
+from paxos.logic.ledger.base import LedgerError
+from paxos.logic.ledger.file import FileLedger
 from paxos.logic.multi import MultiPaxos
 
 

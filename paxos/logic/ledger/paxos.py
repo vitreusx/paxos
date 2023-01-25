@@ -1,4 +1,4 @@
-from paxos.ledger.base import (
+from paxos.logic.ledger.base import (
     Account,
     Decimal,
     Deposit,

@@ -7,7 +7,7 @@ from dacite.config import Config
 from dacite.core import from_dict
 from ruamel.yaml import YAML
 
-from paxos.ledger.base import Decimal, Ledger
+from paxos.logic.ledger.base import Decimal, Ledger
 from paxos.utils.atomic import atomic_save
 
 
