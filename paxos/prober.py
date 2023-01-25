@@ -102,7 +102,7 @@ def main():
                 except:
                     if worker_addr == leader:
                         should_elect = True
-            logger.info(f"currently alive workers: {alive}")
+            logger.debug(f"currently alive workers: {alive}")
             if should_elect:
                 logger.info(f"leader is dead, electing new one")
                 elect_leader()
