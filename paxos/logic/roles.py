@@ -171,6 +171,7 @@ class Learner(RoleBehavior):
         self.accepted_store = MessageStore(quorum_size)
         self.responses_store = MessageStore(quorum_size)
         self.response_await_ev = Event()
+        self.query()
 
     def query(self):
         self.response_await_ev.clear()
