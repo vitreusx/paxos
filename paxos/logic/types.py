@@ -24,7 +24,7 @@ class StateMachine(ABC):
 
     async def sync(self):
         while True:
-            self.logger.critical(f"syncing {self.prefix=}, {self.watermark=}")
+            self.logger.info(f"syncing {self.prefix=}, {self.watermark=}")
             ins_cmd = await self.paxos[self.prefix, self.watermark]
             if ins_cmd is not None:
                 await self.apply(ins_cmd)
