@@ -42,24 +42,11 @@ class Query:
 
 @dataclass
 class QueryResponse:
-    value: Any | None
-
-
-@dataclass
-class Consensus:
-    value: Any
+    accepted: Accepted | None
 
 
 PaxosMsg = (
-    Request
-    | Prepare
-    | Promise
-    | Accept
-    | Accepted
-    | Nack
-    | Query
-    | QueryResponse
-    | Consensus
+    Request | Prepare | Promise | Accept | Accepted | Nack | Query | QueryResponse
 )
 
 NodeID = int

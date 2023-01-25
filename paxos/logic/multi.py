@@ -49,7 +49,8 @@ class MultiPaxos(WriteOnceDict):
     ):
         self.net = net
         self.instances: dict[Any, roles.Server] = {}
-        self.logger = logging.getLogger(f"node[{self.net.me.id}]")
+        self.comm_logger = logging.getLogger(f"node[{self.net.me.id}]")
+        # self.srv_logger = logging.getLogger(f"node[{self.net.me.id}]/srv")
         self.save_path = Path(save_path)
         self.generator_type = generator_type
 
@@ -64,7 +65,7 @@ class MultiPaxos(WriteOnceDict):
     @state.setter
     def state(self, value: dict):
         for key, inst_state in value.items():
-            comm = UDP_Comm(self.net, key, self.logger)
+            comm = UDP_Comm(self.net, key, self.comm_logger)
             self.instances[key] = self._create_server(comm)
             self.instances[key].state = inst_state
 
@@ -79,7 +80,7 @@ class MultiPaxos(WriteOnceDict):
 
     def _lookup(self, key: Any) -> roles.Server:
         if key not in self.instances:
-            comm = UDP_Comm(self.net, key, self.logger)
+            comm = UDP_Comm(self.net, key, self.comm_logger)
             server_inst = self._create_server(comm)
             self.instances[key] = server_inst
         return self.instances[key]
@@ -94,7 +95,7 @@ class MultiPaxos(WriteOnceDict):
         class Handler(socketserver.DatagramRequestHandler):
             def handle(self):
                 payload: Payload = pickle.load(self.rfile)
-                # paxos.log(payload)
+                # paxos.srv_logger.info(format_payload(payload, paxos.net.me.id))
 
                 paxos_inst = paxos._lookup(payload.key)
                 paxos_inst.on_recv(payload.sender, payload.message)

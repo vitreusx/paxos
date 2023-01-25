@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 from threading import Event
 from typing import Any
+import logging
 
 from paxos.logic.communication import Communicator, NodeID, PaxosMsg, Role, RoleBehavior
 from paxos.logic.data import (
     Accept,
     Accepted,
-    Consensus,
     Nack,
     Prepare,
     Promise,
@@ -17,12 +17,39 @@ from paxos.logic.data import (
 from paxos.logic.generator import IDGenerator
 
 
+logger = logging.getLogger("debug")
+logger.setLevel(logging.DEBUG)
+
+
+class AcceptorValues:
+    def __init__(self, quorum_size: int):
+        self.quorum_size = quorum_size
+        self.reset()
+
+    def reset(self):
+        self.consensus_id = None
+        self._values: dict[int, dict[NodeID, Any]] = {}
+
+    def add(self, acc_id: NodeID, val_id: int, value: Any):
+        if val_id not in self._values:
+            self._values[val_id] = {}
+
+        self._values[val_id][acc_id] = value
+        if len(self._values[val_id]) >= self.quorum_size:
+            self.consensus_id = val_id
+
+    @property
+    def values(self):
+        if self.consensus_id is None:
+            return None
+        else:
+            return [*self._values[self.consensus_id].values()]
+
+
 @dataclass
 class Proposal:
     id: int
     value: Any
-    acceptor_ids: set[NodeID] = field(default_factory=set)
-    prev_accepted: list[Accepted] = field(default_factory=list)
 
 
 class Proposer(RoleBehavior):
@@ -31,6 +58,8 @@ class Proposer(RoleBehavior):
         self.quorum_size = quorum_size
         self.id_generator = id_generator
         self.proposal: Proposal | None = None
+        self.promises = AcceptorValues(self.quorum_size)
+        self.accepted = AcceptorValues(self.quorum_size)
         self.request_sent_ev = Event()
         self.value = None
 
@@ -42,7 +71,9 @@ class Proposer(RoleBehavior):
         else:
             req = Request(value)
             id = self.id_generator.next_id()
-            self.proposal = Proposal(id, req.value)
+            self.proposal = Proposal(id=id, value=req.value)
+            self.promises.reset()
+            self.accepted.reset()
             self.request_sent_ev.clear()
             self.comm.send(Prepare(id), self.comm.acceptors)
 
@@ -57,33 +88,30 @@ class Proposer(RoleBehavior):
         if self.proposal is None or promise.id != self.proposal.id:
             return
 
-        if acceptor in self.proposal.acceptor_ids:
-            return
+        self.promises.add(acceptor, promise.id, promise)
+        if self.promises.values is not None:
+            promises: list[Promise] = self.promises.values
 
-        self.proposal.acceptor_ids.add(acceptor)
-
-        if promise.prev is not None:
-            self.proposal.prev_accepted.append(promise.prev)
-
-        if len(self.proposal.acceptor_ids) >= self.quorum_size:
-            if len(self.proposal.prev_accepted) > 0:
-                accepted_value = max(
-                    self.proposal.prev_accepted,
-                    key=lambda accepted: accepted.id,
-                ).value
-            else:
-                accepted_value = self.proposal.value
+            accepted_value, accepted_id = self.proposal.value, None
+            for promise in promises:
+                if promise.prev is None:
+                    continue
+                if accepted_id is None or promise.prev.id > accepted_id:
+                    accepted_id = promise.prev.id
+                    accepted_value = promise.prev.value
 
             msg = Accept(self.proposal.id, accepted_value)
-            self.comm.send(msg, self.proposal.acceptor_ids)
+            self.comm.send(msg, self.comm.acceptors)
 
     def recv_accepted(self, acceptor: NodeID, accepted: Accepted):
         if self.proposal is None:
             return
 
-        self.proposal = None
-        self.value = accepted.value
-        self.request_sent_ev.set()
+        self.accepted.add(acceptor, accepted.id, accepted.value)
+        if self.accepted.values is not None:
+            self.proposal = None
+            self.value = self.accepted.values[0]
+            self.request_sent_ev.set()
 
     def on_recv(self, sender: NodeID, message: PaxosMsg):
         if isinstance(message, Promise):
@@ -94,12 +122,12 @@ class Proposer(RoleBehavior):
             self.recv_accepted(sender, message)
 
     @property
-    def state(self) -> tuple[Any, Any]:
-        return self.proposal, self.id_generator.state
+    def state(self):
+        return self.proposal, self.id_generator.state, self.promises, self.accepted
 
     @state.setter
-    def state(self, value: tuple[Any, Any]):
-        self.proposal, self.id_generator.state = value
+    def state(self, value):
+        self.proposal, self.id_generator.state, self.promises, self.accepted = value
 
 
 class Acceptor(RoleBehavior):
@@ -118,18 +146,15 @@ class Acceptor(RoleBehavior):
         self.comm.send(promise, [proposer])
 
     def recv_accept(self, proposer: NodeID, accept: Accept):
-        if self.promised_id is not None and accept.id < self.promised_id:
+        if self.promised_id is None or accept.id < self.promised_id:
             return
 
         self.promised_id = accept.id
         self.accepted = Accepted(accept.id, accept.value)
-        self.comm.send(self.accepted, self.comm.learners)
+        self.comm.send(self.accepted, {proposer, *self.comm.learners})
 
     def recv_query(self, learner: NodeID, query: Query):
-        value = None
-        if self.accepted is not None:
-            value = self.accepted.value
-        self.comm.send(QueryResponse(value), [learner])
+        self.comm.send(QueryResponse(self.accepted), [learner])
 
     def on_recv(self, sender: NodeID, message: PaxosMsg):
         if isinstance(message, Prepare):
@@ -154,28 +179,38 @@ class Learner(RoleBehavior):
         self.quorum_size = quorum_size
         self.value = None
         self.value_found_ev = Event()
+        self.accepted = AcceptorValues(self.quorum_size)
 
     def query(self):
         if self.value is not None:
             self.value_found_ev.set()
         else:
             self.value_found_ev.clear()
+            self.accepted.reset()
             self.comm.send(Query(), self.comm.acceptors)
 
     def recv_query_response(self, acceptor: NodeID, resp: QueryResponse):
         if self.value is not None:
             return
 
-        if resp.value is not None:
-            self.value = resp.value
+        if resp.accepted is not None:
+            acc = resp.accepted
+            self.accepted.add(acceptor, acc.id, acc.value)
+        else:
+            self.accepted.add(acceptor, -1, None)
+
+        if self.accepted.values is not None:
+            self.value = self.accepted.values[0]
             self.value_found_ev.set()
 
     def recv_accepted(self, acceptor: NodeID, acc: Accepted):
         if self.value is not None:
             return
 
-        self.value = acc.value
-        self.value_found_ev.set()
+        self.accepted.add(acceptor, acc.id, acc.value)
+        if self.accepted.values is not None:
+            self.value = self.accepted.values[0]
+            self.value_found_ev.set()
 
     def on_recv(self, sender: NodeID, message: PaxosMsg) -> None:
         if isinstance(message, QueryResponse):
@@ -185,11 +220,11 @@ class Learner(RoleBehavior):
 
     @property
     def state(self):
-        return self.value
+        return self.value, self.accepted
 
     @state.setter
     def state(self, value):
-        self.value = value
+        self.value, self.accepted = value
 
 
 class Server(RoleBehavior):
