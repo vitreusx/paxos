@@ -24,8 +24,6 @@ def format_payload(payload: data.Payload, receiver_id: int) -> str:
         body = ""
     elif isinstance(paxos_msg, data.QueryResponse):
         body = f"{format_value(paxos_msg.value)}"
-    elif isinstance(paxos_msg, data.Consensus):
-        body = format_value(paxos_msg.value)
     else:
         body = paxos_msg
 

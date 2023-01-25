@@ -42,7 +42,7 @@ class Query:
 
 @dataclass
 class QueryResponse:
-    accepted: Accepted | None
+    value: Accepted | None
 
 
 PaxosMsg = (
