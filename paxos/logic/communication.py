@@ -58,24 +58,14 @@ class Network:
     me: Node
 
     @staticmethod
-    def get_uids(comm_addrs: Iterable[Address]) -> dict[Address, int]:
-        addr_to_id = {addr: idx for idx, addr in enumerate(sorted(comm_addrs))}
-        return addr_to_id
-
-    @staticmethod
-    def from_addresses(addrs: Iterable[Address], addr: Address) -> Network:
+    def from_addresses(addrs: Iterable[Address], uid: NodeID) -> Network:
         """Construct a Paxos network from the addresses of the nodes.
         :param addrs: Addresses of all the nodes in the network.
-        :param addr: Address of the calling process in the network."""
-
-        addrs_ids = Network.get_uids(addrs)
-        my_id = addrs_ids.get(addr)
-
-        assert my_id is not None
+        :param uid: ID of the node in the network."""
 
         all_roles = {Role.ACCEPTOR, Role.LEARNER, Role.PROPOSER}
-        nodes = {uid: Node(uid, addr, all_roles) for addr, uid in addrs_ids.items()}
-        return Network(nodes, nodes[my_id])
+        nodes = {uid: Node(uid, addr, all_roles) for uid, addr in enumerate(addrs)}
+        return Network(nodes, nodes[uid])
 
     def all_of(self, role: Role) -> Iterable[Node]:
         return [node for node in self.nodes.values() if role in node.roles]

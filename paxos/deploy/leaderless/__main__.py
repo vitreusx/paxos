@@ -34,7 +34,7 @@ class Leaderless:
             nargs="+",
             metavar=("MEAN", "MAX_DEV"),
         )
-        p.add_argument("--ledger-file", required=True)
+        p.add_argument("--ledger-dir", required=True)
 
         g = p.add_mutually_exclusive_group()
         g.add_argument("--num-workers", type=int)
@@ -65,21 +65,26 @@ class Leaderless:
                 self.worker_addrs.append(f"localhost:{flask_port}")
 
     def create_workers(self):
-        self.workers = []
+        self.workers = {}
         comm_net = [f"localhost:{p}" for p in self.comm_ports]
         self.paxos_dir = tempfile.TemporaryDirectory()
-        for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
+        for net_uid in range(len(comm_net)):
+            flask_port = self.flask_ports[net_uid]
+            comm_port = self.comm_ports[net_uid]
+            ledger_file = Path(self.args.ledger_dir) / f"node-{net_uid}.yml"
+            ledger_file.parent.mkdir(exist_ok=True, parents=True)
             worker = PaxosWorker(
                 mode="leaderless",
-                flask_port=flask_p,
-                comm_port=comm_p,
-                ledger_file=self.args.ledger_file,
+                flask_port=flask_port,
+                comm_port=comm_port,
+                ledger_file=ledger_file,
                 comm_net=comm_net,
+                net_uid=net_uid,
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
                 generator_type=self.args.generator,
             )
-            self.workers.append(worker)
+            self.workers[net_uid] = worker
             worker.respawn()
 
     def create_gateway(self):

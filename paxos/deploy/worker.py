@@ -30,6 +30,7 @@ class PaxosWorker(AbstractWorker):
         verbose: bool,
         paxos_dir: Union[str, Path],
         generator_type: Literal["incremental", "time_aware"],
+        net_uid: int,
     ):
         super().__init__()
         self.mode = mode
@@ -41,6 +42,7 @@ class PaxosWorker(AbstractWorker):
         self.paxos_dir = Path(paxos_dir).absolute()
         self._proc = None
         self.generator_type = generator_type
+        self.net_uid = net_uid
 
     def kill(self):
         if self.is_alive() and self._proc is not None:
@@ -55,6 +57,7 @@ class PaxosWorker(AbstractWorker):
             args.extend(["--comm-port", str(self.comm_port)])
             args.extend(["--ledger-file", str(self.ledger_file)])
             args.extend(["--comm-net", *self.comm_net])
+            args.extend(["--net-uid", str(self.net_uid)])
             args.extend(["--paxos-dir", str(self.paxos_dir)])
             args.extend(["--generator", self.generator_type])
             if self.verbose:
@@ -73,6 +76,8 @@ class PaxosWorker(AbstractWorker):
 
     def __str__(self):
         if self._proc is not None:
-            return f"Worker(pid={self._proc.pid}, port={self.flask_port})"
+            return (
+                f"Worker[{self.net_uid}](pid={self._proc.pid}, port={self.flask_port})"
+            )
         else:
             return f"Worker(port={self.flask_port})"

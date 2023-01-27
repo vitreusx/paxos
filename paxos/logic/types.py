@@ -20,8 +20,9 @@ class StateMachine(ABC):
 
     async def sync(self):
         while True:
-            ins_cmd = await self.paxos[self.prefix, self.watermark]
-            if ins_cmd is not None:
+            ins_value = await self.paxos[self.prefix, self.watermark]
+            if ins_value is not None:
+                _, ins_cmd = ins_value
                 await self.apply(ins_cmd)
                 self.watermark += 1
             else:

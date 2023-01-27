@@ -73,29 +73,24 @@ class WithLeader:
                 self.comm_ports.append(comm_port)
 
     def create_workers(self):
-        def port_to_host(port: int) -> str:
-            return f"localhost:{port}"
-
         self.workers = {}
+        comm_net = [f"localhost:{p}" for p in self.comm_ports]
         self.paxos_dir = tempfile.TemporaryDirectory()
-        self.worker_uids = []
-
-        comm_net = [port_to_host(p) for p in self.comm_ports]
-        comm_host_to_uid = Network.get_uids(comm_net)
-        for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
+        for net_uid in range(len(comm_net)):
+            flask_port = self.flask_ports[net_uid]
+            comm_port = self.comm_ports[net_uid]
             worker = PaxosWorker(
                 mode="with_leader",
-                flask_port=flask_p,
-                comm_port=comm_p,
+                flask_port=flask_port,
+                comm_port=comm_port,
                 ledger_file=self.args.ledger_file,
                 comm_net=comm_net,
+                net_uid=net_uid,
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
                 generator_type=self.args.generator,
             )
-            uid = comm_host_to_uid[port_to_host(comm_p)]
-            self.workers[uid] = worker
-            self.worker_uids.append(uid)
+            self.workers[net_uid] = worker
             worker.respawn()
 
     def create_gateway(self):
@@ -177,8 +172,18 @@ class WithLeader:
         prober_argv = ["python3", "-m", "paxos.prober"]
         prober_argv.extend(["--probe-period", str(self.args.probe_period)])
         prober_argv.extend(["--port", str(self.prober_port)])
-        prober_argv.extend(["--worker-uids", *(str(uid) for uid in self.worker_uids)])
-        prober_argv.extend(["--worker-ports", *(str(p) for p in self.flask_ports)])
+        prober_argv.extend(
+            [
+                "--worker-uids",
+                *(str(uid) for uid in range(len(self.flask_ports))),
+            ]
+        )
+        prober_argv.extend(
+            [
+                "--worker-ports",
+                *(str(p) for p in self.flask_ports),
+            ]
+        )
         if self.args.gateway_port is not None:
             leader_update_cb = f"http://localhost:{self.flask_port}/leader"
             prober_argv.extend(["--leader-update-cb", leader_update_cb])

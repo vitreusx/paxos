@@ -1,6 +1,6 @@
 #!/usr/bin/sh
 python3 -m paxos.deploy.leaderless \
-  --ledger-file ledger.yml \
+  --ledger-dir ledgers \
   --num-workers 5 \
   --gateway-port 8001 \
   --kill-every 1.0 0.2 \

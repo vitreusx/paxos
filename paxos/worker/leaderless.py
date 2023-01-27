@@ -25,7 +25,8 @@ class Worker:
         p.add_argument("--flask-port", type=int, required=True)
         p.add_argument("--comm-port", type=int, required=True)
         p.add_argument("--ledger-file", required=True)
-        p.add_argument("--comm-net", nargs="*")
+        p.add_argument("--comm-net", nargs="+")
+        p.add_argument("--net-uid", type=int, required=True)
         p.add_argument("--paxos-dir", required=True)
         p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
         p.add_argument("-v", "--verbose", action="store_true")
@@ -111,11 +112,10 @@ class Worker:
         self.flask_thr.start()
 
     def setup_paxos_ledger(self):
-        addr = f"localhost:{self.args.comm_port}"
-        net = Network.from_addresses(self.args.comm_net, addr)
+        net = Network.from_addresses(self.args.comm_net, self.args.net_uid)
         save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
         self.paxos = MultiPaxos(net, save_path, self.args.generator)
-        self.ledger = PaxosLedger(self.paxos, "ledger")
+        self.ledger = PaxosLedger(self.paxos, "ledger", self.args.ledger_file)
 
         def comm_fn():
             with self.paxos.UDP_Server() as srv:
@@ -129,14 +129,7 @@ class Worker:
 
         self.comm_thr.start()
 
-    def main(self):
-        self.args = self.parse_args()
-        self.setup_logging()
-
-        self.finishing = threading.Event()
-        self.setup_paxos_ledger()
-        self.setup_flask()
-
+    def wait_for_signal(self):
         def handler(signo, frame):
             self.finishing.set()
 
@@ -145,8 +138,21 @@ class Worker:
 
         self.finishing.wait()
 
+    def cleanup(self):
         self.paxos_srv.shutdown()
         self.comm_thr.join()
+
+    def main(self):
+        self.args = self.parse_args()
+        self.setup_logging()
+
+        self.finishing = threading.Event()
+        self.setup_paxos_ledger()
+        self.setup_flask()
+
+        self.wait_for_signal()
+
+        self.cleanup()
 
 
 if __name__ == "__main__":

@@ -5,8 +5,9 @@ import socket
 import socketserver
 from logging import Logger
 from pathlib import Path
-from typing import Any, Iterable, Literal, Union
+from typing import Any, Iterable, Literal, Union, Tuple
 import time
+import uuid
 
 from paxos.logic import roles
 from paxos.logic.communication import Communicator, Network, NodeID, PaxosMsg, Role
@@ -113,16 +114,18 @@ class MultiPaxos(WriteOnceDict):
         proposer = self._lookup(key).proposer
 
         timeout = 1.0
+        value_uuid = uuid.uuid4()
         while True:
-            proposer.request(value)
-            set_value = await self[key]
-            if set_value is not None:
-                return set_value
+            proposer.request((value_uuid, value))
+            set_item = await self[key]
+            if set_item is not None:
+                set_uuid, set_value = set_item
+                return set_uuid == value_uuid, set_value
             else:
                 time.sleep(timeout)
                 timeout *= random.random() + 1.0
 
-    async def __getitem__(self, key: Any) -> Any | None:
+    async def __getitem__(self, key: Any) -> Tuple[uuid.UUID, Any] | None:
         """Get the value associated with a given key. If consensus has not yet been reached on what should be the value, None is returned."""
 
         learner = self._lookup(key).learner

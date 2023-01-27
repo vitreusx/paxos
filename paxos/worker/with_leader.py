@@ -25,7 +25,8 @@ class Worker:
         p.add_argument("--flask-port", type=int, required=True)
         p.add_argument("--comm-port", type=int, required=True)
         p.add_argument("--ledger-file", required=True)
-        p.add_argument("--comm-net", nargs="*")
+        p.add_argument("--comm-net", nargs="+")
+        p.add_argument("--net-uid", type=int, required=True)
         p.add_argument("--paxos-dir", required=True)
         p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
         p.add_argument("-v", "--verbose", action="store_true")
@@ -105,7 +106,7 @@ class Worker:
         @app.post("/admin/elect_leader/<int:election_id>")
         async def elect_leader(election_id: int):
             proposal = f"http://{request.host}"
-            leader = await self.paxos.set(f"leader_{election_id}", proposal)
+            _, leader = await self.paxos.set(f"leader_{election_id}", proposal)
             return {"leader": leader}
 
         self.flask_thr = Thread(
@@ -120,8 +121,7 @@ class Worker:
         self.flask_thr.start()
 
     def setup_paxos(self):
-        addr = f"localhost:{self.args.comm_port}"
-        net = Network.from_addresses(self.args.comm_net, addr)
+        net = Network.from_addresses(self.args.comm_net, self.args.net_uid)
         save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
         self.paxos = MultiPaxos(net, save_path, self.args.generator)
 
@@ -137,6 +137,19 @@ class Worker:
 
         self.comm_thr.start()
 
+    def wait_for_signal(self):
+        def handler(signo, frame):
+            self.finishing.set()
+
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            signal.signal(sig, handler)
+
+        self.finishing.wait()
+
+    def cleanup(self):
+        self.paxos_srv.shutdown()
+        self.comm_thr.join()
+
     def main(self):
         self.args = self.parse_args()
         self.setup_logging()
@@ -146,16 +159,9 @@ class Worker:
         self.setup_paxos()
         self.setup_flask()
 
-        def handler(signo, frame):
-            self.finishing.set()
+        self.wait_for_signal()
 
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            signal.signal(sig, handler)
-
-        self.finishing.wait()
-
-        self.paxos_srv.shutdown()
-        self.comm_thr.join()
+        self.cleanup()
 
 
 if __name__ == "__main__":
