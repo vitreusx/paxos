@@ -119,6 +119,8 @@ class Worker:
         self.paxos = MultiPaxos(net, save_path, self.args.generator)
         ledger_file = Path(self.args.ledger_file)
         ledger_file = ledger_file.with_stem(f"{ledger_file.stem}-{net.me.id}")
+        if ledger_file.exists():
+            ledger_file.unlink()
         self.ledger = PaxosLedger(self.paxos, "ledger", self.logger, ledger_file)
 
         def comm_fn():
