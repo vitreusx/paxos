@@ -39,22 +39,16 @@ def format_accept_body(msg: data.Accept | data.Accepted | None) -> str:
 
 
 def format_value(value: Any) -> str:
-    match value:
-        case uuid, val:
-            if not isinstance(uuid, UUID):
-                body = str(value)
-            if isinstance(val, PaxosVar.SetValue):
-                body = str(val.new_value)
-            elif isinstance(val, OpenAccount):
-                body = "OPENACCOUNT"
-            elif isinstance(val, Deposit):
-                body = f"DEPOSIT {val.amount}$ to {val.uid}"
-            elif isinstance(val, Withdraw):
-                body = f"WITHDRAW {val.amount}$ from {val.uid}"
-            elif isinstance(val, Transfer):
-                body = f"TRANSFER {val.amount}$ {val.from_uid} -> {val.to_uid}"
-            else:
-                body = str(value)
-        case _:
-            body = str(value)
+    if isinstance(value, PaxosVar.SetValue):
+        body = str(value.new_value)
+    elif isinstance(value, OpenAccount):
+        body = "OPENACCOUNT"
+    elif isinstance(value, Deposit):
+        body = f"DEPOSIT {value.amount}$ to {value.uid}"
+    elif isinstance(value, Withdraw):
+        body = f"WITHDRAW {value.amount}$ from {value.uid}"
+    elif isinstance(value, Transfer):
+        body = f"TRANSFER {value.amount}$ {value.from_uid} -> {value.to_uid}"
+    else:
+        body = str(value)
     return f"[{body}]"
