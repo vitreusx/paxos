@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from threading import Event
@@ -81,11 +82,11 @@ class Proposer(RoleBehavior):
         if self.proposal is None or nack.id != self.proposal.id:
             return
 
-        self.proposal = None
         self.request_sent_ev.set()
 
     def recv_promise(self, acceptor: NodeID, promise: Promise):
         if self.proposal is None or promise.id != self.proposal.id:
+            # logging.critical(f'disregarding promise, {self.proposal=}, {promise=}')
             return
 
         self.promises_store.add(acceptor, promise.id, promise)
@@ -175,7 +176,6 @@ class Learner(RoleBehavior):
 
     def query(self):
         self.response_await_ev.clear()
-        self._responses_recv = 0
         self.comm.send(Query(), self.comm.learners)
 
     def recv_query_resp(self, learner: NodeID, query_resp: QueryResponse):
@@ -183,7 +183,6 @@ class Learner(RoleBehavior):
         if query_resp.value is None and not self.responses_store.quorum_gathered:
             return
 
-        self._active = False
         self.consensus_value = query_resp.value
         self.response_await_ev.set()
 
