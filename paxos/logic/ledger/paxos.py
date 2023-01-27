@@ -10,13 +10,16 @@ from paxos.logic.ledger.base import (
     Transfer,
     Withdraw,
 )
+from paxos.logic.ledger.file import FileLedger
 from paxos.logic.multi import MultiPaxos
 from paxos.logic.types import StateMachine
 
 
 class PaxosLedger(StateMachine):
-    def __init__(self, paxos: MultiPaxos, prefix: str, parent_logger: Logger):
-        ledger = Ledger.empty()
+    def __init__(
+        self, paxos: MultiPaxos, prefix: str, parent_logger: Logger, ledger_path
+    ):
+        ledger = FileLedger(ledger_path)
         super().__init__(paxos, prefix, ledger, parent_logger.getChild("ledger"))
 
     async def apply(self, cmd: LedgerCmd):

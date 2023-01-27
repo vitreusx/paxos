@@ -117,7 +117,9 @@ class Worker:
         net = Network.from_addresses(self.args.comm_net, addr)
         save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
         self.paxos = MultiPaxos(net, save_path, self.args.generator)
-        self.ledger = PaxosLedger(self.paxos, "ledger", self.logger)
+        ledger_file = Path(self.args.ledger_file)
+        ledger_file = ledger_file.with_stem(f"{ledger_file.stem}-{net.me.id}")
+        self.ledger = PaxosLedger(self.paxos, "ledger", self.logger, ledger_file)
 
         def comm_fn():
             with self.paxos.UDP_Server() as srv:
