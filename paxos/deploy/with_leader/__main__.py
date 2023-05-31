@@ -16,9 +16,11 @@ import scipy.stats
 from flask import Flask, request
 from marshmallow import Schema, fields
 
-from paxos.deploy.killer import Killer
+from paxos.deploy.killer.interactive import InteractiveKiller
+from paxos.deploy.killer.random import RandomKiller
 from paxos.deploy.sockets import SocketSet
 from paxos.deploy.worker import PaxosWorker
+from paxos.logic.communication import Network
 
 
 class WithLeader:
@@ -43,14 +45,15 @@ class WithLeader:
         p.add_argument("--num-workers", type=int)
         p.add_argument("--gateway-port", type=int)
         p.add_argument("-v", "--verbose", action="store_true")
+        p.add_argument("--killer-port", type=int)
+        p.add_argument("--killer-type", type=str, choices=["interactive", "random"])
+        p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
 
         return p.parse_args()
 
     def setup_logging(self):
         # Set up the logger - by default INFO-level stuff is suppressed.
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
 
     def reserve_ports(self):
         with SocketSet() as sset:
@@ -68,10 +71,17 @@ class WithLeader:
                 self.comm_ports.append(comm_port)
 
     def create_workers(self):
-        self.workers = []
-        comm_net = [f"localhost:{p}" for p in self.comm_ports]
+        def port_to_host(port: int) -> str:
+            return f"localhost:{port}"
+
+        self.workers = {}
         self.paxos_dir = tempfile.TemporaryDirectory()
+        self.worker_uids = []
+
+        comm_net = [port_to_host(p) for p in self.comm_ports]
+        comm_host_to_uid = Network.get_uids(comm_net)
         for flask_p, comm_p in zip(self.flask_ports, self.comm_ports):
+            uid = comm_host_to_uid[port_to_host(comm_p)]
             worker = PaxosWorker(
                 mode="with_leader",
                 flask_port=flask_p,
@@ -80,8 +90,11 @@ class WithLeader:
                 comm_net=comm_net,
                 verbose=self.args.verbose,
                 paxos_dir=self.paxos_dir.name,
+                generator_type=self.args.generator,
+                node_id=uid,
             )
-            self.workers.append(worker)
+            self.workers[uid] = worker
+            self.worker_uids.append(uid)
             worker.respawn()
 
     def create_gateway(self):
@@ -142,19 +155,26 @@ class WithLeader:
         return scipy.stats.uniform(loc=loc, scale=scale)
 
     def create_killer(self):
-        kill_every = self.get_delay_rv(self.args.kill_every)
-        if self.args.restart_after is not None:
-            restart_after = self.get_delay_rv(self.args.restart_after)
+        if self.args.killer_type == "interactive":
+            self.killer = InteractiveKiller(
+                self.workers, self.finishing, self.args.killer_port
+            )
         else:
-            restart_after = None
-
-        self.killer = Killer(self.workers, self.finishing, kill_every, restart_after)
+            kill_every = self.get_delay_rv(self.args.kill_every)
+            if self.args.restart_after is not None:
+                restart_after = self.get_delay_rv(self.args.restart_after)
+            else:
+                restart_after = None
+            self.killer = RandomKiller(
+                self.workers, self.finishing, kill_every, restart_after
+            )
         self.killer.start()
 
     def create_prober(self):
         prober_argv = ["python3", "-m", "paxos.prober"]
         prober_argv.extend(["--probe-period", str(self.args.probe_period)])
         prober_argv.extend(["--port", str(self.prober_port)])
+        prober_argv.extend(["--worker-uids", *(str(uid) for uid in self.worker_uids)])
         prober_argv.extend(["--worker-ports", *(str(p) for p in self.flask_ports)])
         if self.args.gateway_port is not None:
             leader_update_cb = f"http://localhost:{self.flask_port}/leader"
@@ -182,10 +202,10 @@ class WithLeader:
             self.gateway.terminate()
             self.gateway.wait()
 
-        if self.args.kill_every is not None:
-            self.killer.join()
+        # if self.args.kill_every is not None:
+        self.killer.join()
 
-        for worker in self.workers:
+        for worker in self.workers.values():
             worker.kill()
 
     def main(self):

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
-from typing import Dict
 
-from paxos.utils.atomic import AtomicMixin, atomic, atomic_save
+from paxos.utils.atomic import AtomicMixin, atomic
 
 
 class LedgerError(Exception):
@@ -19,8 +17,35 @@ class Account:
 
 
 @dataclass
+class OpenAccount:
+    pass
+
+
+@dataclass
+class Deposit:
+    uid: int
+    amount: Decimal
+
+
+@dataclass
+class Withdraw:
+    uid: int
+    amount: Decimal
+
+
+@dataclass
+class Transfer:
+    from_uid: int
+    to_uid: int
+    amount: Decimal
+
+
+LedgerCmd = OpenAccount | Deposit | Withdraw | Transfer
+
+
+@dataclass
 class Ledger(AtomicMixin):
-    accounts: Dict[int, Account]
+    accounts: dict[int, Account]
     next_uid: int
 
     def __post_init__(self):

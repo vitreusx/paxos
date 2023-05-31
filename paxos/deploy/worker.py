@@ -1,9 +1,22 @@
 import subprocess
+from abc import ABC, abstractmethod
 from pathlib import Path
 from subprocess import DEVNULL
-from typing import List, Union, Literal
+from typing import List, Literal, Union
 
-from paxos.deploy.killer import AbstractWorker
+
+class AbstractWorker(ABC):
+    @abstractmethod
+    def kill(self):
+        ...
+
+    @abstractmethod
+    def respawn(self):
+        ...
+
+    @abstractmethod
+    def is_alive(self) -> bool:
+        ...
 
 
 class PaxosWorker(AbstractWorker):
@@ -16,6 +29,8 @@ class PaxosWorker(AbstractWorker):
         comm_net: List[str],
         verbose: bool,
         paxos_dir: Union[str, Path],
+        generator_type: Literal["incremental", "time_aware"],
+        node_id: int,
     ):
         super().__init__()
         self.mode = mode
@@ -26,6 +41,8 @@ class PaxosWorker(AbstractWorker):
         self.verbose = verbose
         self.paxos_dir = Path(paxos_dir).absolute()
         self._proc = None
+        self.generator_type = generator_type
+        self.node_id = node_id
 
     def kill(self):
         if self.is_alive() and self._proc is not None:
@@ -41,6 +58,8 @@ class PaxosWorker(AbstractWorker):
             args.extend(["--ledger-file", str(self.ledger_file)])
             args.extend(["--comm-net", *self.comm_net])
             args.extend(["--paxos-dir", str(self.paxos_dir)])
+            args.extend(["--generator", self.generator_type])
+            args.extend(["--node-id", str(self.node_id)])
             if self.verbose:
                 args.extend(["-v"])
 

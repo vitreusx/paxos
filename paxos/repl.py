@@ -8,11 +8,16 @@ import requests
 from prompt_toolkit.completion import WordCompleter
 
 
+class UserExit(Exception):
+    pass
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("-u", "--url")
     p.add_argument("-p", "--port")
     p.add_argument("-e", "--exec")
+    p.add_argument("--killer-port", type=int)
 
     args = p.parse_args()
     if args.url is not None:
@@ -21,6 +26,8 @@ def main():
         assert args.port is not None
         url = f"http://localhost:{args.port}"
 
+    killer_url = f"http://localhost:{args.killer_port}"
+
     opt_p = argparse.ArgumentParser()
     opt_sp = opt_p.add_subparsers(dest="endpoint")
 
@@ -28,7 +35,15 @@ def main():
     help_p.add_argument(
         "command",
         default=None,
-        choices=["account", "withdraw", "deposit", "transfer"],
+        choices=[
+            "account",
+            "withdraw",
+            "deposit",
+            "transfer",
+            "quit",
+            "kill",
+            "respawn",
+        ],
     )
 
     account_p = opt_sp.add_parser("account")
@@ -49,6 +64,14 @@ def main():
     transfer_p.add_argument("to", type=int)
     transfer_p.add_argument("amount", type=str)
 
+    quit_p = opt_sp.add_parser("quit")
+
+    kill_p = opt_sp.add_parser("kill")
+    kill_p.add_argument("uid", type=int)
+
+    respawn_p = opt_sp.add_parser("respawn")
+    respawn_p.add_argument("uid", type=int)
+
     def on_prompt(text):
         try:
             args = opt_p.parse_args(shlex.split(text))
@@ -64,6 +87,9 @@ def main():
                         "withdraw": withdraw_p,
                         "deposit": deposit_p,
                         "transfer": transfer_p,
+                        "quit": quit_p,
+                        "kill": kill_p,
+                        "respawn": respawn_p,
                     }[args.command]
                     p.print_help()
                 else:
@@ -102,7 +128,17 @@ def main():
                 }
                 resp = requests.post(req_url, json=payload)
                 resp.raise_for_status()
-        except requests.HTTPError as e:
+            elif args.endpoint == "quit":
+                raise UserExit
+            elif args.endpoint == "kill":
+                req_url = urljoin(killer_url, f"/kill/{args.uid}")
+                resp = requests.post(req_url)
+                resp.raise_for_status()
+            elif args.endpoint == "respawn":
+                req_url = urljoin(killer_url, f"/respawn/{args.uid}")
+                resp = requests.post(req_url)
+                resp.raise_for_status()
+        except (requests.HTTPError, requests.ConnectionError) as e:
             if e.errno == http.HTTPStatus.BAD_REQUEST.value:
                 error_data = resp.json()
                 print(f"[{error_data['error']}] {error_data['details']}")
@@ -119,9 +155,7 @@ def main():
             try:
                 text = sess.prompt()
                 on_prompt(text)
-            except KeyboardInterrupt:
-                continue
-            except EOFError:
+            except (KeyboardInterrupt, EOFError, UserExit):
                 break
 
 

@@ -1,18 +1,18 @@
 import argparse
-import asyncio
 import http
 import logging
 import signal
 import threading
 from pathlib import Path
 from threading import Thread
+
 from flask import Flask, jsonify, request
 from marshmallow import Schema, ValidationError, fields
+
 from paxos.logic.communication import Network
+from paxos.logic.ledger.base import LedgerError
+from paxos.logic.ledger.paxos import PaxosLedger
 from paxos.logic.multi import MultiPaxos
-from paxos.logic.types import PaxosVar
-from .paxos_ledger import PaxosLedger
-from .ledger import LedgerError
 
 
 class Worker:
@@ -27,14 +27,15 @@ class Worker:
         p.add_argument("--ledger-file", required=True)
         p.add_argument("--comm-net", nargs="*")
         p.add_argument("--paxos-dir", required=True)
+        p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
         p.add_argument("-v", "--verbose", action="store_true")
+        p.add_argument("--node-id", type=int, required=True)
 
         return p.parse_args()
 
     def setup_logging(self):
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
+        self.logger = logging.getLogger(f"worker[{self.args.node_id}]")
 
     def setup_flask(self):
         app = Flask(__name__)
@@ -75,8 +76,8 @@ class Worker:
             uid = fields.Int()
             amount = fields.Decimal()
 
-        @app.post("/withdrawal")
-        async def withdrawal():
+        @app.post("/withdraw")
+        async def withdraw():
             data = WithdrawalSchema().load(request.json)
             await self.ledger.withdraw(data["uid"], data["amount"])
             return {}
@@ -115,8 +116,12 @@ class Worker:
         addr = f"localhost:{self.args.comm_port}"
         net = Network.from_addresses(self.args.comm_net, addr)
         save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
-        self.paxos = MultiPaxos(net, save_path)
-        self.ledger = PaxosLedger(self.paxos, "ledger")
+        self.paxos = MultiPaxos(net, save_path, self.args.generator)
+        ledger_file = Path(self.args.ledger_file)
+        ledger_file = ledger_file.with_stem(f"{ledger_file.stem}-{net.me.id}")
+        if ledger_file.exists():
+            ledger_file.unlink()
+        self.ledger = PaxosLedger(self.paxos, "ledger", self.logger, ledger_file)
 
         def comm_fn():
             with self.paxos.UDP_Server() as srv:

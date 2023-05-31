@@ -1,17 +1,18 @@
 import argparse
-import asyncio
 import http
 import logging
 import signal
 import threading
 from pathlib import Path
 from threading import Thread
+
 from flask import Flask, jsonify, request
 from marshmallow import Schema, ValidationError, fields
+
 from paxos.logic.communication import Network
+from paxos.logic.ledger.base import LedgerError
+from paxos.logic.ledger.file import FileLedger
 from paxos.logic.multi import MultiPaxos
-from paxos.logic.types import PaxosVar
-from .file_ledger import FileLedger, LedgerError
 
 
 class Worker:
@@ -26,14 +27,15 @@ class Worker:
         p.add_argument("--ledger-file", required=True)
         p.add_argument("--comm-net", nargs="*")
         p.add_argument("--paxos-dir", required=True)
+        p.add_argument("--generator", type=str, choices=["incremental", "time_aware"])
         p.add_argument("-v", "--verbose", action="store_true")
+        p.add_argument("--node-id", type=int, required=True)
 
         return p.parse_args()
 
     def setup_logging(self):
         logging.getLogger("werkzeug").setLevel(logging.WARN)
-        level = logging.INFO if self.args.verbose else logging.WARN
-        logging.basicConfig(level=level)
+        self.logger = logging.getLogger(f"worker[{self.args.node_id}]")
 
     def setup_flask(self):
         app = Flask(__name__)
@@ -74,8 +76,8 @@ class Worker:
             uid = fields.Int()
             amount = fields.Decimal()
 
-        @app.post("/withdrawal")
-        def withdrawal():
+        @app.post("/withdraw")
+        def withdraw():
             data = WithdrawalSchema().load(request.json)
             self.ledger.withdraw(data["uid"], data["amount"])
             return {}
@@ -99,11 +101,11 @@ class Worker:
         def healthcheck():
             return {}
 
-        @app.post("/admin/elect_leader")
-        async def elect_leader():
+        @app.post("/admin/elect_leader/<int:election_id>")
+        async def elect_leader(election_id: int):
             proposal = f"http://{request.host}"
-            await self.leader.set(proposal)
-            return {"leader": proposal}
+            leader = await self.paxos.set(f"leader_{election_id}", proposal)
+            return {"leader": leader}
 
         self.flask_thr = Thread(
             target=lambda: app.run(
@@ -120,8 +122,7 @@ class Worker:
         addr = f"localhost:{self.args.comm_port}"
         net = Network.from_addresses(self.args.comm_net, addr)
         save_path = Path(self.args.paxos_dir) / f"node-{net.me.id}.pkl"
-        self.paxos = MultiPaxos(net, save_path)
-        self.leader = PaxosVar(self.paxos, "leader", None)
+        self.paxos = MultiPaxos(net, save_path, self.args.generator)
 
         def comm_fn():
             with self.paxos.UDP_Server() as srv:

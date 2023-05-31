@@ -5,10 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, List
 
-from paxos.logic.data import PaxosMsg
-
-NodeID = int
-Address = str
+from paxos.logic.data import Address, NodeID, PaxosMsg
 
 
 class Role(Enum):
@@ -17,7 +14,6 @@ class Role(Enum):
     PROPOSER = 0
     ACCEPTOR = 1
     LEARNER = 2
-    QUESTIONER = 3
 
 
 class Communicator(ABC):
@@ -30,6 +26,10 @@ class Communicator(ABC):
     @abstractmethod
     def all_of(self, role: Role) -> List[NodeID]:
         """Get IDs of all nodes in the network with a given role."""
+
+    @property
+    def proposers(self):
+        return self.all_of(Role.PROPOSER)
 
     @property
     def acceptors(self):
@@ -57,24 +57,23 @@ class Network:
     me: Node
 
     @staticmethod
+    def get_uids(comm_addrs: Iterable[Address]) -> dict[Address, int]:
+        addr_to_id = {addr: idx for idx, addr in enumerate(sorted(comm_addrs))}
+        return addr_to_id
+
+    @staticmethod
     def from_addresses(addrs: Iterable[Address], addr: Address) -> Network:
         """Construct a Paxos network from the addresses of the nodes.
         :param addrs: Addresses of all the nodes in the network.
         :param addr: Address of the calling process in the network."""
 
-        addrs_ids = [(addr, idx) for idx, addr in enumerate(addrs)]
-        addrs_ids = sorted(addrs_ids, key=lambda x: x[0])
-
-        my_id = None
-        for node_addr, node_id in addrs_ids:
-            if addr == node_addr:
-                my_id = node_id
-                break
+        addrs_ids = Network.get_uids(addrs)
+        my_id = addrs_ids.get(addr)
 
         assert my_id is not None
 
         all_roles = {Role.ACCEPTOR, Role.LEARNER, Role.PROPOSER}
-        nodes = {uid: Node(uid, addr, all_roles) for addr, uid in addrs_ids}
+        nodes = {uid: Node(uid, addr, all_roles) for addr, uid in addrs_ids.items()}
         return Network(nodes, nodes[my_id])
 
     def all_of(self, role: Role) -> Iterable[Node]:
